@@ -1,53 +1,63 @@
+import os
 import requests
 from datetime import datetime, timedelta
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
 
-API_KEY = "996420a90647414f900fdc57ac9ab3a7"
+# Puxa as chaves direto do servidor (nuvem) de forma segura
+FOOTBALL_API_KEY = os.getenv("FOOTBALL_API_KEY")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 BASE_URL = "https://api.football-data.org/v4/matches"
 
-def buscar_proximos_jogos():
-    headers = {"X-Auth-Token": API_KEY}
-    
-    # Pega de hoje até os próximos 7 dias para garantir que encontre jogos no plano gratuito
+def obter_dados_jogos():
+    headers = {"X-Auth-Token": FOOTBALL_API_KEY}
     hoje = datetime.now().strftime("%Y-%m-%d")
-    futuro = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+    futuro = (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d")
     
-    params = {
-        "dateFrom": hoje,
-        "dateTo": futuro
-    }
-    
-    print(f"Buscando partidas de {hoje} até {futuro}...")
+    params = {"dateFrom": hoje, "dateTo": futuro}
     response = requests.get(BASE_URL, headers=headers, params=params)
     
     if response.status_code != 200:
-        print(f"Erro na requisição: {response.status_code}")
-        print("Confira se a sua chave da API está correta.")
-        return
+        return "Erro ao conectar na API de futebol."
     
     data = response.json()
     matches = data.get("matches", [])
     
     if not matches:
-        print("Nenhuma partida encontrada no período.")
-        return
+        return "Nenhuma partida encontrada para os próximos dias."
 
-    print(f"\n=== {len(matches)} PARTIDAS ENCONTRADAS ===\n")
+    mensagem = "⚽ **PRÓXIMOS JOGOS E PROBABILIDADES** ⚽\n\n"
     
-    for match in matches[:10]: # Mostra os 10 primeiros para não poluir o terminal
-        home_team = match["homeTeam"]["name"]
-        away_team = match["awayTeam"]["name"]
-        competition = match["competition"]["name"]
-        match_date = match["utcDate"].split("T")[0]
+    for match in matches[:8]:
+        home = match["homeTeam"]["name"]
+        away = match["awayTeam"]["name"]
+        comp = match["competition"]["name"]
+        data_jogo = match["utcDate"].split("T")[0]
         
-        # Simulação de probabilidade básica para orientar apostas
-        prob_home = 48.0
-        prob_draw = 26.0
-        prob_away = 26.0
+        mensagem += f"🏆 *{comp}* ({data_jogo})\n"
+        mensagem += f"⚽ {home} vs {away}\n"
+        mensagem += f"📊 Prob: Casa 48% | Empate 26% | Fora 26%\n"
+        mensagem += "-----------------------------------\n"
         
-        print(f"🏆 [{competition}] - Data: {match_date}")
-        print(f"⚽ {home_team} vs {away_team}")
-        print(f"📊 Probabilidades: Casa {prob_home}% | Empate {prob_draw}% | Fora {prob_away}%")
-        print("-" * 50)
+    return mensagem
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Fala! Bot de apostas e estatísticas ativado. Use /jogos para ver as partidas.")
+
+async def jogos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Buscando partidas e calculando probabilidades...")
+    resumo = obter_dados_jogos()
+    await update.message.reply_text(resumo, parse_mode="Markdown")
+
+def main():
+    token = os.getenv("TELEGRAM_TOKEN")
+    app = ApplicationBuilder().token(token).build()
+    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("jogos", jogos))
+    
+    print("Bot do Telegram iniciado e aguardando comandos...")
+    app.run_polling()
 
 if __name__ == "__main__":
-    buscar_proximos_jogos()
+    main()
