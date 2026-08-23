@@ -10,7 +10,6 @@ API_KEY = os.getenv("API_KEY")
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
 # IDs das principais ligas de elite (Futebol nacional e internacional de alto volume)
-# Exemplos: Brasileirão Série A/B, Premier League, La Liga, Serie A (Itália), Champions League, etc.
 LIGAS_PERMITIDAS = {
     71, 72,    # Brasileirão Série A e B
     39, 40,    # Premier League e Championship (Inglaterra)
@@ -73,7 +72,7 @@ def extrair_estatistica(stats_team, nome_estatistica):
     return 0
 
 def main():
-    print("🤖 Robô Elite (Com Filtro de Ligas Principais) iniciado!")
+    print("🤖 Robô Elite (Com Rodapé Profissional) iniciado!")
     
     jogos_notificados = set()
 
@@ -85,7 +84,7 @@ def main():
             try:
                 league_id = match['league']['id']
                 
-                # BLOQUEIO DE LIGAS DESCONHECIDAS: Se não estiver na lista de elite, ignora imediatamente
+                # BLOQUEIO DE LIGAS DESCONHECIDAS
                 if league_id not in LIGAS_PERMITIDAS:
                     continue
 
@@ -112,7 +111,7 @@ def main():
                         stats_away = estatisticas[1]['statistics']
 
                         shots_on_home = extrair_estatistica(stats_home, "Shots on Goal")
-                        shots_on_away = extrair_estatistica(stats_home, "Shots on Goal")
+                        shots_on_away = extrair_estatistica(stats_away, "Shots on Goal")
                         total_shots_home = extrair_estatistica(stats_home, "Total Shots")
                         total_shots_away = extrair_estatistica(stats_away, "Total Shots")
                         corners_home = extrair_estatistica(stats_home, "Corner Kicks")
@@ -155,7 +154,7 @@ def main():
                                 f"• Posse de Bola: {pos_home}% x {pos_away}%\n"
                                 f"• xG Estimado (Volume): {xg_home} x {xg_away}\n"
                                 f"🔥 Pressão extrema e sufocante detectada!\n\n"
-                                f"⏱️ *Gerado em {datetime.now().strftime('%H:%M:%S')}*"
+                                f"🛡️ *Canal VIP - Gestão e Disciplina Sempre.*"
                             )
                             
                             enviar_telegram(mensagem)
