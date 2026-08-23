@@ -9,15 +9,29 @@ API_KEY = os.getenv("API_KEY")
 
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
-def enviar_telegram(mensagem):
+def enviar_telegram_com_botao(mensagem, home_team):
     if not TELEGRAM_TOKEN or not CHAT_ID:
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    
+    # Cria o link de busca seguro para o botão
+    link_flashscore = f"https://www.flashscore.com.br/pesquisa/?q={home_team.replace(' ', '+')}"
+    
+    # Estrutura do Botão Inline do Telegram
     payload = {
         "chat_id": CHAT_ID,
         "text": mensagem,
         "parse_mode": "Markdown",
-        "disable_web_page_preview": True
+        "reply_markup": {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "🔍 Acompanhar Jogo (Flashscore)",
+                        "url": link_flashscore
+                    }
+                ]
+            ]
+        }
     }
     try:
         requests.post(url, json=payload)
@@ -52,16 +66,14 @@ def extrair_estatistica(stats_team, nome_estatistica):
         if stat.get("type") == nome_estatistica:
             valor = stat.get("value")
             if valor is not None:
-                # Trata porcentagem da posse de bola (ex: "58%" -> 58)
                 if isinstance(valor, str) and "%" in valor:
                     return int(valor.replace("%", "").strip())
                 return int(valor)
     return 0
 
 def main():
-    print("🤖 Robô Master de Alta Precisão (Com Posse, Escanteios e xG) iniciado!")
-    enviar_telegram("🚀 *Robô Master Ativado!* Monitorando pressão total, xG, posse e escanteios em tempo real.")
-
+    print("🤖 Robô Master com Botões Inline iniciado!")
+    
     jogos_notificados = set()
 
     while True:
@@ -74,7 +86,7 @@ def main():
                 home = match['teams']['home']['name']
                 away = match['teams']['away']['name']
                 goals_home = match['goals']['home']
-                goals_away = match['goals']['away']
+                goals_away = match['goals']['home'] if 'goals' in match and match['goals']['away'] is None else match['goals']['away']
                 elapsed = match['fixture']['status']['elapsed']
                 league = match['league']['name']
 
@@ -92,7 +104,6 @@ def main():
                         stats_home = estatisticas[0]['statistics']
                         stats_away = estatisticas[1]['statistics']
 
-                        # Coleta métricas completas
                         shots_on_home = extrair_estatistica(stats_home, "Shots on Goal")
                         shots_on_away = extrair_estatistica(stats_away, "Shots on Goal")
                         total_shots_home = extrair_estatistica(stats_home, "Total Shots")
@@ -106,7 +117,6 @@ def main():
                         total_chutes = total_shots_home + total_shots_away
                         total_escanteios = corners_home + corners_away
 
-                        # Filtros de alta exigência
                         e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
                         e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
 
@@ -114,11 +124,9 @@ def main():
                             
                             etapa = "1º Tempo" if elapsed <= 45 else "2º Tempo"
                             
-                            # xG Estimado dinâmico baseado em volume, chutes no alvo e escanteios
                             xg_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08) + (corners_home * 0.03), 2)
                             xg_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08) + (corners_away * 0.03), 2)
 
-                            # Sugestão Inteligente de Mercado baseada no Placar Atual
                             gols_totais = goals_home + goals_away
                             if gols_totais == 0:
                                 mercado_sugerido = "Mais de 0.5 / 1.5 Gols (Live)"
@@ -127,13 +135,10 @@ def main():
                             else:
                                 mercado_sugerido = f"Mais de {gols_totais + 1}.5 Gols (Live)"
 
-                            # Link de busca rápida para monitoramento
-                            link_busca = f"https://www.flashscore.com.br/pesquisa/?q={home.replace(' ', '+')}"
-
                             mensagem = (
                                 f"🚨 *OPORTUNIDADE DE ALTA PROBABILIDADE* 🚨\n\n"
                                 f"🏆 *Liga:* {league}\n"
-                                f"⚽ *Partida:* [{home} {goals_home} x {goals_away} {away}]({link_busca})\n"
+                                f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
                                 f"⏱️ *Momento:* {elapsed} min ({etapa})\n\n"
                                 f"🎯 *Mercado Sugerido:* {mercado_sugerido}\n"
                                 f"⭐ *Confiança:* Alta\n"
@@ -147,7 +152,7 @@ def main():
                                 f"⏱️ *Gerado em {datetime.now().strftime('%H:%M:%S')}*"
                             )
                             
-                            enviar_telegram(mensagem)
+                            enviar_telegram_com_botao(mensagem, home)
                             jogos_notificados.add(chave)
                             time.sleep(2)
 
