@@ -36,7 +36,7 @@ def buscar_jogos_ao_vivo():
     return []
 
 def main():
-    print("Robô blindado de alta confiança iniciado na nuvem.")
+    print("Robô blindado de alta confiança (Tempo Integral) iniciado na nuvem.")
     jogos_notificados = set()
 
     while True:
@@ -56,21 +56,25 @@ def main():
                 if goals_home is None: goals_home = 0
                 if goals_away is None: goals_away = 0
 
-                # Exemplo de regra alinhada com o padrão da sua imagem (ex: jogo avançado no 2º tempo)
-                if elapsed and elapsed >= 70:
+                # MONITORAMENTO EM TEMPO INTEGRAL:
+                # Dispara em momentos-chave tanto no 1º tempo quanto no 2º tempo
+                if elapsed and ((22 <= elapsed <= 38) or (70 <= elapsed <= 88)):
+                    
                     chave = f"{fixture_id}-{elapsed//10}"
                     if chave in jogos_notificados:
                         continue
 
-                    # Mensagem estruturada exatamente no padrão que você gosta
+                    # Identifica se é 1º ou 2º tempo para personalizar a análise
+                    etapa = "1º Tempo" if elapsed <= 45 else "2º Tempo"
+
                     mensagem = (
                         f"🚨 *OPORTUNIDADE DETECTADA (DIRETO DA API)* 🚨\n\n"
                         f"⚽ *Partida:* {home} vs {away}\n"
                         f"📊 *Placar Atual:* {goals_home} x {goals_away}\n"
-                        f"🎯 *Mercado Sugerido:* Mais de 1.5 / 2.5 Gols (Live)\n"
+                        f"🎯 *Mercado Sugerido:* Mais de Gols ({etapa} - Live)\n"
                         f"⭐ *Confiança:* Alta\n"
                         f"💡 *Análise Estatística:*\n"
-                        f"Ritmo forte no 2º tempo aos {elapsed} min ({goals_home}x{goals_away}). Alta pressão detectada.\n\n"
+                        f"Pressão intensa no {etapa} aos {elapsed} min ({goals_home}x{goals_away}). Ritmo acelerado detectado.\n\n"
                         f"⏱️ *Gerado automaticamente pelo Robô em {datetime.now().strftime('%H:%M:%S')}*"
                     )
                     
