@@ -9,29 +9,15 @@ API_KEY = os.getenv("API_KEY")
 
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
-def enviar_telegram_com_botao(mensagem, home_team):
+def enviar_telegram(mensagem):
     if not TELEGRAM_TOKEN or not CHAT_ID:
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    
-    # Cria o link de busca seguro para o botão
-    link_flashscore = f"https://www.flashscore.com.br/pesquisa/?q={home_team.replace(' ', '+')}"
-    
-    # Estrutura do Botão Inline do Telegram
     payload = {
         "chat_id": CHAT_ID,
         "text": mensagem,
         "parse_mode": "Markdown",
-        "reply_markup": {
-            "inline_keyboard": [
-                [
-                    {
-                        "text": "🔍 Acompanhar Jogo (Flashscore)",
-                        "url": link_flashscore
-                    }
-                ]
-            ]
-        }
+        "disable_web_page_preview": True
     }
     try:
         requests.post(url, json=payload)
@@ -72,7 +58,7 @@ def extrair_estatistica(stats_team, nome_estatistica):
     return 0
 
 def main():
-    print("🤖 Robô Master com Botões Inline iniciado!")
+    print("🤖 Robô Master Limpo (Foco Bet365 / Esportiva.bet) iniciado!")
     
     jogos_notificados = set()
 
@@ -86,7 +72,7 @@ def main():
                 home = match['teams']['home']['name']
                 away = match['teams']['away']['name']
                 goals_home = match['goals']['home']
-                goals_away = match['goals']['home'] if 'goals' in match and match['goals']['away'] is None else match['goals']['away']
+                goals_away = match['goals']['away']
                 elapsed = match['fixture']['status']['elapsed']
                 league = match['league']['name']
 
@@ -107,7 +93,7 @@ def main():
                         shots_on_home = extrair_estatistica(stats_home, "Shots on Goal")
                         shots_on_away = extrair_estatistica(stats_away, "Shots on Goal")
                         total_shots_home = extrair_estatistica(stats_home, "Total Shots")
-                        total_shots_away = extrair_estatistica(stats_away, "Total Shots")
+                        total_shots_away = extrair_estatistica(stats_home, "Total Shots")
                         corners_home = extrair_estatistica(stats_home, "Corner Kicks")
                         corners_away = extrair_estatistica(stats_away, "Corner Kicks")
                         pos_home = extrair_estatistica(stats_home, "Ball Possession")
@@ -115,7 +101,6 @@ def main():
                         
                         total_chutes_alvo = shots_on_home + shots_on_away
                         total_chutes = total_shots_home + total_shots_away
-                        total_escanteios = corners_home + corners_away
 
                         e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
                         e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
@@ -152,7 +137,7 @@ def main():
                                 f"⏱️ *Gerado em {datetime.now().strftime('%H:%M:%S')}*"
                             )
                             
-                            enviar_telegram_com_botao(mensagem, home)
+                            enviar_telegram(mensagem)
                             jogos_notificados.add(chave)
                             time.sleep(2)
 
