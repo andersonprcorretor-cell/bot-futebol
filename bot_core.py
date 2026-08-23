@@ -54,13 +54,13 @@ def extrair_estatistica(stats_team, nome_estatistica):
     return 0
 
 def main():
-    print("🤖 Robô Avançado de Análise Estatística (Pressão Real) iniciado!")
-    enviar_telegram("🚀 *Robô com Filtro Estatístico Ativo!* Analisando chutes, pressão e volume ofensivo em tempo real.")
+    print("🤖 Robô de Alta Precisão (Filtro Rigoroso) iniciado!")
+    enviar_telegram("🎯 *Filtro Rigoroso Ativado!* Reduzindo alertas para entregar apenas oportunidades de altíssima pressão.")
 
     jogos_notificados = set()
 
     while True:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e estatísticas ao vivo...")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e aplicando filtro rígido...")
         partidas = buscar_jogos_ao_vivo()
 
         for match in partidas:
@@ -76,21 +76,18 @@ def main():
                 if goals_home is None: goals_home = 0
                 if goals_away is None: goals_away = 0
 
-                # CRITÉRIO DE TEMPO: A partir dos 10 min do 1ºT até o fim do jogo (evitando intervalos mortos)
-                if elapsed and ((10 <= elapsed <= 43) or (50 <= elapsed <= 88)):
-                    
-                    chave = f"{fixture_id}-{elapsed // 15}" # Evita spam na mesma janela de 15 min
+                if elapsed:
+                    # Chave única para não repetir o mesmo jogo na mesma fase
+                    chave = f"{fixture_id}-{elapsed // 20}"
                     if chave in jogos_notificados:
                         continue
 
-                    # Busca as estatísticas reais da API para validar a pressão
                     estatisticas = buscar_estatisticas_partida(fixture_id)
                     
                     if len(estatisticas) == 2:
                         stats_home = estatisticas[0]['statistics']
                         stats_away = estatisticas[1]['statistics']
 
-                        # Coleta métricas de pressão (Chutes no alvo e Chutes Totais)
                         shots_on_home = extrair_estatistica(stats_home, "Shots on Goal")
                         shots_on_away = extrair_estatistica(stats_away, "Shots on Goal")
                         total_shots_home = extrair_estatistica(stats_home, "Total Shots")
@@ -99,24 +96,32 @@ def main():
                         total_chutes_alvo = shots_on_home + shots_on_away
                         total_chutes = total_shots_home + total_shots_away
 
-                        # FILTRO DE ALTA PRESSÃO REAL:
-                        # Só dispara se o jogo realmente tiver volume ofensivo (ex: mínimo de chutes ou pressão combinada)
-                        # Você pode ajustar esses números conforme sua exigência
-                        if total_chutes >= 8 or total_chutes_alvo >= 3:
+                        # FILTRAGEM RIGOROSA DE ALTA PROBABILIDADE:
+                        # 1º Tempo: Exige intensidade rápida (ex: a partir dos 18' com pelo menos 2 chutes no alvo ou 5 totais)
+                        # 2º Tempo: Exige pressão real acumulada (a partir dos 55' com pelo menos 4 chutes no alvo ou 12 totais)
+                        e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
+                        e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
+
+                        if e_primeiro_tempo or e_segundo_tempo:
                             
                             etapa = "1º Tempo" if elapsed <= 45 else "2º Tempo"
+                            
+                            # Cálculo de xG Estimado baseado em volume real de finalizações e chutes no alvo
+                            xg_estimado_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08), 2)
+                            xg_estimado_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08), 2)
 
                             mensagem = (
-                                f"🚨 *OPORTUNIDADE DETECTADA (COM ESTATÍSTICAS)* 🚨\n\n"
+                                f"🚨 *OPORTUNIDADE DE ALTA PROBABILIDADE* 🚨\n\n"
                                 f"🏆 *Liga:* {league}\n"
                                 f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
                                 f"⏱️ *Momento:* {elapsed} min ({etapa})\n\n"
                                 f"🎯 *Mercado Sugerido:* Mais de Gols (Live)\n"
                                 f"⭐ *Confiança:* Alta\n"
-                                f"💡 *Análise Estatística Real:*\n"
+                                f"💡 *Análise Estatística & Pressão:*\n"
                                 f"• Chutes no Alvo: {shots_on_home} x {shots_on_away}\n"
                                 f"• Finalizações Totais: {total_chutes}\n"
-                                f"🔥 Pressão forte detectada em campo!\n\n"
+                                f"• xG Estimado (Volume): {xg_estimado_home} x {xg_estimado_away}\n"
+                                f"🔥 Pressão extrema e sufocante detectada!\n\n"
                                 f"⏱️ *Gerado em {datetime.now().strftime('%H:%M:%S')}*"
                             )
                             
@@ -127,7 +132,7 @@ def main():
             except Exception as e:
                 continue
 
-        # Aguarda 3 minutos para a próxima varredura geral
+        # Aguarda 3 minutos para a nova varredura
         time.sleep(180)
 
 if __name__ == "__main__":
