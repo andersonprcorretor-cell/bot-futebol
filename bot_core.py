@@ -9,6 +9,21 @@ API_KEY = os.getenv("API_KEY")
 
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
+# IDs das principais ligas de elite (Futebol nacional e internacional de alto volume)
+# Exemplos: Brasileirão Série A/B, Premier League, La Liga, Serie A (Itália), Champions League, etc.
+LIGAS_PERMITIDAS = {
+    71, 72,    # Brasileirão Série A e B
+    39, 40,    # Premier League e Championship (Inglaterra)
+    140, 141,  # La Liga e La Liga 2 (Espanha)
+    135,       # Serie A (Itália)
+    78,        # Bundesliga (Alemanha)
+    61,        # Ligue 1 (França)
+    2,         # UEFA Champions League
+    3,         # UEFA Europa League
+    13,        # Copa Libertadores
+    11         # Copa Sul-Americana
+}
+
 def enviar_telegram(mensagem):
     if not TELEGRAM_TOKEN or not CHAT_ID:
         return
@@ -58,16 +73,22 @@ def extrair_estatistica(stats_team, nome_estatistica):
     return 0
 
 def main():
-    print("🤖 Robô Master Limpo (Foco Bet365 / Esportiva.bet) iniciado!")
+    print("🤖 Robô Elite (Com Filtro de Ligas Principais) iniciado!")
     
     jogos_notificados = set()
 
     while True:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e estatísticas avançadas...")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e aplicando filtro de elite...")
         partidas = buscar_jogos_ao_vivo()
 
         for match in partidas:
             try:
+                league_id = match['league']['id']
+                
+                # BLOQUEIO DE LIGAS DESCONHECIDAS: Se não estiver na lista de elite, ignora imediatamente
+                if league_id not in LIGAS_PERMITIDAS:
+                    continue
+
                 fixture_id = match['fixture']['id']
                 home = match['teams']['home']['name']
                 away = match['teams']['away']['name']
@@ -91,9 +112,9 @@ def main():
                         stats_away = estatisticas[1]['statistics']
 
                         shots_on_home = extrair_estatistica(stats_home, "Shots on Goal")
-                        shots_on_away = extrair_estatistica(stats_away, "Shots on Goal")
+                        shots_on_away = extrair_estatistica(stats_home, "Shots on Goal")
                         total_shots_home = extrair_estatistica(stats_home, "Total Shots")
-                        total_shots_away = extrair_estatistica(stats_home, "Total Shots")
+                        total_shots_away = extrair_estatistica(stats_away, "Total Shots")
                         corners_home = extrair_estatistica(stats_home, "Corner Kicks")
                         corners_away = extrair_estatistica(stats_away, "Corner Kicks")
                         pos_home = extrair_estatistica(stats_home, "Ball Possession")
