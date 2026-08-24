@@ -16,7 +16,7 @@ LIGAS_PERMITIDAS = {
     140, 141,  # La Liga e La Liga 2 (Espanha)
     135,       # Serie A (Itália)
     78,        # Bundesliga (Alemanha)
-    81,        # DFB-Pokal (Copa da Alemanha) 👈 ADICIONADO AQUI!
+    81,        # DFB-Pokal (Copa da Alemanha)
     61,        # Ligue 1 (França)
     2,         # UEFA Champions League
     3,         # UEFA Europa League
@@ -86,18 +86,20 @@ def gerar_barra_pressao(valor_total):
     return f"`{preenchido}{vazio}` ({porcentagem}%)"
 
 def main():
-    print("🤖 Robô Elite (Gols + Escanteios + Copa da Alemanha) iniciado!")
+    print("🤖 Robô Elite (Gols + Escanteios + Feedbacks Duplos) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
-    sinais_ativos = {}
+    sinais_ativos = {} # Armazena sinais pendentes de feedback (gols e cantos)
 
     while True:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e gerando barras de pressão...")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e checando feedbacks...")
         partidas = buscar_jogos_ao_vivo()
         partidas_dict = {match['fixture']['id']: match for match in partidas}
 
-        # 1. Checagem de Feedback (Green)
+        # ==========================================
+        # 1. CHECAGEM DE FEEDBACKS (Gols e Escanteios)
+        # ==========================================
         for fixture_id, info in list(sinais_ativos.items()):
             match_atual = partidas_dict.get(fixture_id)
             if not match_atual:
@@ -109,6 +111,7 @@ def main():
             gols_totais_atual = g_home + g_away
             elapsed_atual = match_atual['fixture']['status']['elapsed'] or 0
 
+            # Feedback de Gols
             if info['tipo'] == 'gols' and gols_totais_atual > info['gols_no_alerta']:
                 tempo_para_agir = elapsed_atual - info['minuto_alerta']
                 if tempo_para_agir < 0: 
@@ -121,11 +124,33 @@ def main():
                     f"⚽ Gol saiu aos {elapsed_atual}'\n"
                     f"⏳ Você teve {tempo_para_agir} minutos para agir!"
                 )
-                
                 enviar_telegram(feedback_msg, reply_to_message_id=info['message_id'])
                 del sinais_ativos[fixture_id]
+                continue
 
-        # 2. Varredura de Novas Oportunidades
+            # Feedback de Escanteios (Precisa buscar estatísticas atuais para conferir o total de cantos)
+            if info['tipo'] == 'cantos':
+                estatisticas_fb = buscar_estatisticas_partida(fixture_id)
+                if len(estatisticas_fb) == 2:
+                    c_home = extrair_estatistica(estatisticas_fb[0]['statistics'], "Corner Kicks")
+                    c_away = extrair_estatistica(estatisticas_fb[1]['statistics'], "Corner Kicks")
+                    cantos_totais_atual = c_home + c_away
+
+                    # Se o total de escanteios ultrapassou a linha sugerida ou o jogo acabou batendo a meta
+                    if cantos_totais_atual > info['meta_cantos'] or (elapsed_atual >= 90 and cantos_totais_atual >= info['meta_cantos']):
+                        feedback_cantos = (
+                            f"🟢 *ESCANTEIOS CONFIRMADOS!*\n"
+                            f"🚩 {info['home']} vs {info['away']}\n"
+                            f"⏱️ Alerta aos {info['minuto_alerta']}' ({info['cantos_no_alerta']} cantos)\n"
+                            f"📈 Fechou com {cantos_totais_atual} escanteios no total!\n"
+                            f"🎯 Meta batida com sucesso!"
+                        )
+                        enviar_telegram(feedback_cantos, reply_to_message_id=info['message_id'])
+                        del sinais_ativos[fixture_id]
+
+        # ==========================================
+        # 2. VARREDURA DE NOVAS OPORTUNIDADES
+        # ==========================================
         for match in partidas:
             try:
                 league_id = match['league']['id']
@@ -170,7 +195,7 @@ def main():
                         total_chutes = total_shots_home + total_shots_away
                         total_escanteios = corners_home + corners_away
 
-                        # A. Alerta de Gols com Barra Visual
+                        # A. Alerta de Gols
                         if not jogo_goleada and chave_gol not in jogos_notificados_gols:
                             e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
                             e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
@@ -220,9 +245,10 @@ def main():
                                 jogos_notificados_gols.add(chave_gol)
                                 time.sleep(2)
 
-                        # B. Alerta de Escanteios com Barra Visual
+                        # B. Alerta de Escanteios
                         if chave_canto not in jogos_notificados_cantos:
                             if 65 <= elapsed <= 85 and total_escanteios >= 8:
+                                meta_cantos_sugerida = total_escanteios + 2
                                 mercado_cantos = f"Mais de {total_escanteios + 2.5} Cantos (Asiáticos Live)"
                                 barra_grafica_cantos = gerar_barra_pressao(total_escanteios)
                                 
@@ -241,7 +267,18 @@ def main():
                                     f"⚠️ Alerta estatístico de volume lateral."
                                 )
                                 
-                                enviar_telegram(mensagem_cantos)
+                                msg_id_canto = enviar_telegram(mensagem_cantos)
+                                if msg_id_canto:
+                                    sinais_ativos[fixture_id] = {
+                                        'message_id': msg_id_canto,
+                                        'minuto_alerta': elapsed,
+                                        'cantos_no_alerta': total_escanteios,
+                                        'meta_cantos': meta_cantos_sugerida,
+                                        'home': home,
+                                        'away': away,
+                                        'tipo': 'cantos'
+                                    }
+
                                 jogos_notificados_cantos.add(chave_canto)
                                 time.sleep(2)
 
