@@ -86,19 +86,54 @@ def gerar_barra_pressao(valor_total):
     return f"`{preenchido}{vazio}` ({porcentagem}%)"
 
 def main():
-    print("🤖 Robô Elite (Gols + Escanteios + Feedbacks Duplos) iniciado!")
+    print("🤖 Robô Elite (Com Trava Anti-VAR) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
-    sinais_ativos = {} # Armazena sinais pendentes de feedback (gols e cantos)
+    sinais_ativos = {} 
+    gols_pendentes_var = {} # Armazena gols detectados aguardando confirmação (Trava Anti-VAR)
 
     while True:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e checando feedbacks...")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e checando feedbacks/VAR...")
         partidas = buscar_jogos_ao_vivo()
         partidas_dict = {match['fixture']['id']: match for match in partidas}
 
         # ==========================================
-        # 1. CHECAGEM DE FEEDBACKS (Gols e Escanteios)
+        # 1. TRATAMENTO DA TRAVA ANTI-VAR PARA GOLS
+        # ==========================================
+        for fixture_id, pendente in list(gols_pendentes_var.items()):
+            match_atual = partidas_dict.get(fixture_id)
+            if not match_atual:
+                del gols_pendentes_var[fixture_id]
+                continue
+
+            g_home_atual = match_atual['goals']['home'] if match_atual['goals']['home'] is not None else 0
+            g_away_atual = match_atual['goals']['away'] if match_atual['goals']['away'] is not None else 0
+            gols_totais_atual = g_home_atual + g_away_atual
+            elapsed_atual = match_atual['fixture']['status']['elapsed'] or 0
+
+            # Se após o ciclo de espera o placar continua maior, o gol é real (passou pelo VAR)
+            if gols_totais_atual >= pendente['novo_total_gols']:
+                tempo_para_agir = elapsed_atual - pendente['minuto_alerta']
+                if tempo_para_agir < 0: 
+                    tempo_para_agir = 1
+
+                feedback_msg = (
+                    f"🟢 *GOL CONFIRMADO depois do alerta!*\n"
+                    f"⚽ {pendente['home']} {g_home_atual} x {g_away_atual} {pendente['away']} • Placar Atual\n"
+                    f"⏱️ Alerta enviado aos {pendente['minuto_alerta']}'\n"
+                    f"⚽ Gol saiu aos {elapsed_atual}'\n"
+                    f"⏳ Você teve {tempo_para_agir} minutos para agir!"
+                )
+                enviar_telegram(feedback_msg, reply_to_message_id=pendente['message_id'])
+                del gols_pendentes_var[fixture_id]
+            else:
+                # Se o placar caiu de novo, o VAR anulou! Descartamos sem mandar Green falso.
+                print(f"⚠️ Gol anulado pelo VAR detectado na partida {pendente['home']} x {pendente['away']}. Alerta cancelado.")
+                del gols_pendentes_var[fixture_id]
+
+        # ==========================================
+        # 2. CHECAGEM DE FEEDBACKS (Gols ativos e Escanteios)
         # ==========================================
         for fixture_id, info in list(sinais_ativos.items()):
             match_atual = partidas_dict.get(fixture_id)
@@ -111,24 +146,19 @@ def main():
             gols_totais_atual = g_home + g_away
             elapsed_atual = match_atual['fixture']['status']['elapsed'] or 0
 
-            # Feedback de Gols
+            # Detecção inicial de gol (joga para a lista de espera Anti-VAR)
             if info['tipo'] == 'gols' and gols_totais_atual > info['gols_no_alerta']:
-                tempo_para_agir = elapsed_atual - info['minuto_alerta']
-                if tempo_para_agir < 0: 
-                    tempo_para_agir = 1
-
-                feedback_msg = (
-                    f"🟢 *GOL CONFIRMADO depois do alerta!*\n"
-                    f"⚽ {info['home']} {g_home} x {g_away} {info['away']} • Placar Atual\n"
-                    f"⏱️ Alerta enviado aos {info['minuto_alerta']}'\n"
-                    f"⚽ Gol saiu aos {elapsed_atual}'\n"
-                    f"⏳ Você teve {tempo_para_agir} minutos para agir!"
-                )
-                enviar_telegram(feedback_msg, reply_to_message_id=info['message_id'])
+                gols_pendentes_var[fixture_id] = {
+                    'message_id': info['message_id'],
+                    'minuto_alerta': info['minuto_alerta'],
+                    'novo_total_gols': gols_totais_atual,
+                    'home': info['home'],
+                    'away': info['away']
+                }
                 del sinais_ativos[fixture_id]
                 continue
 
-            # Feedback de Escanteios (Precisa buscar estatísticas atuais para conferir o total de cantos)
+            # Feedback de Escanteios
             if info['tipo'] == 'cantos':
                 estatisticas_fb = buscar_estatisticas_partida(fixture_id)
                 if len(estatisticas_fb) == 2:
@@ -136,7 +166,6 @@ def main():
                     c_away = extrair_estatistica(estatisticas_fb[1]['statistics'], "Corner Kicks")
                     cantos_totais_atual = c_home + c_away
 
-                    # Se o total de escanteios ultrapassou a linha sugerida ou o jogo acabou batendo a meta
                     if cantos_totais_atual > info['meta_cantos'] or (elapsed_atual >= 90 and cantos_totais_atual >= info['meta_cantos']):
                         feedback_cantos = (
                             f"🟢 *ESCANTEIOS CONFIRMADOS!*\n"
@@ -149,7 +178,7 @@ def main():
                         del sinais_ativos[fixture_id]
 
         # ==========================================
-        # 2. VARREDURA DE NOVAS OPORTUNIDADES
+        # 3. VARREDURA DE NOVAS OPORTUNIDADES
         # ==========================================
         for match in partidas:
             try:
@@ -201,7 +230,6 @@ def main():
                             e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
 
                             if e_primeiro_tempo or e_segundo_tempo:
-                                etapa = "1º Tempo" if elapsed <= 45 else "2º Tempo"
                                 xg_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08) + (corners_home * 0.03), 2)
                                 xg_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08) + (corners_away * 0.03), 2)
 
