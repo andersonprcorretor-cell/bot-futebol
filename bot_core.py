@@ -1,7 +1,7 @@
 import os
 import time
 import requests
-from datetime import datetime
+from datetime import datetime, time as dtime
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -9,7 +9,6 @@ API_KEY = os.getenv("API_KEY")
 
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
-# IDs das principais ligas de elite e copas
 LIGAS_PERMITIDAS = {
     71, 72,    # Brasileirão Série A e B
     39, 40,    # Premier League e Championship (Inglaterra)
@@ -23,6 +22,31 @@ LIGAS_PERMITIDAS = {
     13,        # Copa Libertadores
     11         # Copa Sul-Americana
 }
+
+# Estatísticas diárias para o Relatório
+estatisticas_diarias = {
+    "data_atual": datetime.now().date(),
+    "gols_enviados": 0,
+    "gols_green": 0,
+    "gols_red_ou_anulado": 0,
+    "cantos_enviados": 0,
+    "cantos_green": 0,
+    "cantos_red": 0
+}
+
+def reiniciar_estatisticas_se_novo_dia():
+    global estatisticas_diarias
+    hoje = datetime.now().date()
+    if estatisticas_diarias["data_atual"] != hoje:
+        estatisticas_diarias = {
+            "data_atual": hoje,
+            "gols_enviados": 0,
+            "gols_green": 0,
+            "gols_red_ou_anulado": 0,
+            "cantos_enviados": 0,
+            "cantos_green": 0,
+            "cantos_red": 0
+        }
 
 def enviar_telegram(mensagem, reply_to_message_id=None):
     if not TELEGRAM_TOKEN or not CHAT_ID:
@@ -82,19 +106,64 @@ def gerar_barra_pressao(valor_total):
     pontos = min(max(int(valor_total), 1), 10)
     preenchido = "█" * pontos
     vazio = "░" * (10 - pontos)
-    porcentagem = pontos * 10
-    return f"`{preenchido}{vazio}` ({porcentagem}%)"
+    return f"`{preenchido}{vazio}` ({pontos * 10}%)"
+
+def enviar_relatorio_diario():
+    global estatisticas_diarias
+    total_gols = estatisticas_diarias["gols_enviados"]
+    total_cantos = estatisticas_diarias["cantos_enviados"]
+    
+    g_green = estatisticas_diarias["gols_green"]
+    g_red = estatisticas_diarias["gols_red_ou_anulado"]
+    c_green = estatisticas_diarias["cantos_green"]
+    c_red = estatisticas_diarias["cantos_red"]
+
+    total_sinais = total_gols + total_cantos
+    total_acertos = g_green + c_green
+    total_erros = g_red + c_red
+
+    win_rate = (total_acertos / total_sinais * 100) if total_sinais > 0 else 0
+
+    relatorio = (
+        f"📊 *RELATÓRIO DIÁRIO DE RESULTADOS* 📊\n"
+        f"📅 Data: {estatisticas_diarias['data_atual'].strftime('%d/%m/%Y')}\n\n"
+        f"⚽ *Mercado de Gols:*\n"
+        f"• Alertas Enviados: {total_gols}\n"
+        f"• Greens (Confirmados): {g_green} 🟢\n"
+        f"• Reds / Anulados (VAR): {g_red} 🔴\n\n"
+        f"🚩 *Mercado de Escanteios:*\n"
+        f"• Alertas Enviados: {total_cantos}\n"
+        f"• Greens (Bateu Meta): {c_green} 🟢\n"
+        f"• Reds (Não Bateu): {c_red} 🔴\n\n"
+        f"📈 *Balanço Geral do Dia:*\n"
+        f"• Total de Entradas: {total_sinais}\n"
+        f"• Acertos: {total_acertos} | Erros: {total_erros}\n"
+        f"🎯 *Assertividade (Win Rate): {win_rate:.1f}%*\n\n"
+        f"💪 Seguimos firmes e com gestão de banca profissional para amanhã!"
+    )
+    enviar_telegram(relatorio)
+    print("📢 Relatório diário enviado com sucesso!")
 
 def main():
-    print("🤖 Robô Elite (Com Trava Anti-VAR) iniciado!")
+    print("🤖 Robô Elite (Com Trava Anti-VAR e Relatório Diário) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
     sinais_ativos = {} 
-    gols_pendentes_var = {} # Armazena gols detectados aguardando confirmação (Trava Anti-VAR)
+    gols_pendentes_var = {} 
+
+    ultimo_dia_relatorio = datetime.now().date()
 
     while True:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e checando feedbacks/VAR...")
+        reiniciar_estatisticas_se_novo_dia()
+        
+        agora = datetime.now()
+        # Gatilho para disparar o relatório diário à meia-noite (00:00 a 00:05)
+        if agora.hour == 0 and agora.minute < 5 and ultimo_dia_relatorio != agora.date():
+            enviar_relatorio_diario()
+            ultimo_dia_relatorio = agora.date()
+
+        print(f"[{agora.strftime('%H:%M:%S')}] Varrendo partidas e checando feedbacks/VAR...")
         partidas = buscar_jogos_ao_vivo()
         partidas_dict = {match['fixture']['id']: match for match in partidas}
 
@@ -112,7 +181,6 @@ def main():
             gols_totais_atual = g_home_atual + g_away_atual
             elapsed_atual = match_atual['fixture']['status']['elapsed'] or 0
 
-            # Se após o ciclo de espera o placar continua maior, o gol é real (passou pelo VAR)
             if gols_totais_atual >= pendente['novo_total_gols']:
                 tempo_para_agir = elapsed_atual - pendente['minuto_alerta']
                 if tempo_para_agir < 0: 
@@ -126,10 +194,14 @@ def main():
                     f"⏳ Você teve {tempo_para_agir} minutos para agir!"
                 )
                 enviar_telegram(feedback_msg, reply_to_message_id=pendente['message_id'])
+                
+                # Computa Green de Gols
+                estatisticas_diarias["gols_green"] += 1
                 del gols_pendentes_var[fixture_id]
             else:
-                # Se o placar caiu de novo, o VAR anulou! Descartamos sem mandar Green falso.
                 print(f"⚠️ Gol anulado pelo VAR detectado na partida {pendente['home']} x {pendente['away']}. Alerta cancelado.")
+                # Computa Red/Anulado de Gols
+                estatisticas_diarias["gols_red_ou_anulado"] += 1
                 del gols_pendentes_var[fixture_id]
 
         # ==========================================
@@ -146,7 +218,6 @@ def main():
             gols_totais_atual = g_home + g_away
             elapsed_atual = match_atual['fixture']['status']['elapsed'] or 0
 
-            # Detecção inicial de gol (joga para a lista de espera Anti-VAR)
             if info['tipo'] == 'gols' and gols_totais_atual > info['gols_no_alerta']:
                 gols_pendentes_var[fixture_id] = {
                     'message_id': info['message_id'],
@@ -158,7 +229,6 @@ def main():
                 del sinais_ativos[fixture_id]
                 continue
 
-            # Feedback de Escanteios
             if info['tipo'] == 'cantos':
                 estatisticas_fb = buscar_estatisticas_partida(fixture_id)
                 if len(estatisticas_fb) == 2:
@@ -175,6 +245,20 @@ def main():
                             f"🎯 Meta batida com sucesso!"
                         )
                         enviar_telegram(feedback_cantos, reply_to_message_id=info['message_id'])
+                        
+                        # Computa Green de Escanteios
+                        estatisticas_diarias["cantos_green"] += 1
+                        del sinais_ativos[fixture_id]
+                    elif elapsed_atual >= 90 and cantos_totais_atual < info['meta_cantos']:
+                        feedback_red = (
+                            f"🔴 *ESCANTEIOS NÃO BATERAM*\n"
+                            f"🚩 {info['home']} vs {info['away']}\n"
+                            f"⏱️ Alerta aos {info['minuto_alerta']}' | Fechou com {cantos_totais_atual} cantos (Meta: {info['meta_cantos']})"
+                        )
+                        enviar_telegram(feedback_red, reply_to_message_id=info['message_id'])
+                        
+                        # Computa Red de Escanteios
+                        estatisticas_diarias["cantos_red"] += 1
                         del sinais_ativos[fixture_id]
 
         # ==========================================
@@ -269,6 +353,7 @@ def main():
                                         'away': away,
                                         'tipo': 'gols'
                                     }
+                                    estatisticas_diarias["gols_enviados"] += 1
 
                                 jogos_notificados_gols.add(chave_gol)
                                 time.sleep(2)
@@ -306,6 +391,7 @@ def main():
                                         'away': away,
                                         'tipo': 'cantos'
                                     }
+                                    estatisticas_diarias["cantos_enviados"] += 1
 
                                 jogos_notificados_cantos.add(chave_canto)
                                 time.sleep(2)
