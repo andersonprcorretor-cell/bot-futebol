@@ -23,9 +23,9 @@ LIGAS_PERMITIDAS = {
     11         # Copa Sul-Americana
 }
 
-def enviar_telegram(mensagem):
+def enviar_telegram(mensagem, reply_to_message_id=None):
     if not TELEGRAM_TOKEN or not CHAT_ID:
-        return
+        return None
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": CHAT_ID,
@@ -33,10 +33,16 @@ def enviar_telegram(mensagem):
         "parse_mode": "Markdown",
         "disable_web_page_preview": True
     }
+    if reply_to_message_id:
+        payload["reply_to_message_id"] = reply_to_message_id
+
     try:
-        requests.post(url, json=payload)
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            return response.json().get("result", {}).get("message_id")
     except Exception as e:
         print(f"Erro Telegram: {e}")
+    return None
 
 def buscar_jogos_ao_vivo():
     headers = {"x-apisports-key": API_KEY}
@@ -71,21 +77,58 @@ def extrair_estatistica(stats_team, nome_estatistica):
                 return int(valor)
     return 0
 
+def gerar_barra_pressao(valor_total):
+    # Cria uma barra de 10 blocos baseada no volume de finalizações/chutes
+    pontos = min(max(int(valor_total), 1), 10)
+    preenchido = "█" * pontos
+    vazio = "░" * (10 - pontos)
+    porcentagem = pontos * 10
+    return f"`{preenchido}{vazio}` ({porcentagem}%)"
+
 def main():
-    print("🤖 Robô Elite (Gols + Escanteios) iniciado!")
+    print("🤖 Robô Elite (Gols + Escanteios + Gráfico Visual) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
+    sinais_ativos = {}
 
     while True:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e analisando Gols & Escanteios...")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e gerando barras de pressão...")
         partidas = buscar_jogos_ao_vivo()
+        partidas_dict = {match['fixture']['id']: match for match in partidas}
 
+        # 1. Checagem de Feedback (Green)
+        for fixture_id, info in list(sinais_ativos.items()):
+            match_atual = partidas_dict.get(fixture_id)
+            if not match_atual:
+                del sinais_ativos[fixture_id]
+                continue
+
+            g_home = match_atual['goals']['home'] if match_atual['goals']['home'] is not None else 0
+            g_away = match_atual['goals']['away'] if match_atual['goals']['away'] is not None else 0
+            gols_totais_atual = g_home + g_away
+            elapsed_atual = match_atual['fixture']['status']['elapsed'] or 0
+
+            if info['tipo'] == 'gols' and gols_totais_atual > info['gols_no_alerta']:
+                tempo_para_agir = elapsed_atual - info['minuto_alerta']
+                if tempo_para_agir < 0: 
+                    tempo_para_agir = 1
+
+                feedback_msg = (
+                    f"🟢 *GOL CONFIRMADO depois do alerta!*\n"
+                    f"⚽ {info['home']} {g_home} x {g_away} {info['away']} • Placar Atual\n"
+                    f"⏱️ Alerta enviado aos {info['minuto_alerta']}'\n"
+                    f"⚽ Gol saiu aos {elapsed_atual}'\n"
+                    f"⏳ Você teve {tempo_para_agir} minutos para agir!"
+                )
+                
+                enviar_telegram(feedback_msg, reply_to_message_id=info['message_id'])
+                del sinais_ativos[fixture_id]
+
+        # 2. Varredura de Novas Oportunidades
         for match in partidas:
             try:
                 league_id = match['league']['id']
-                
-                # BLOQUEIO DE LIGAS DESCONHECIDAS
                 if league_id not in LIGAS_PERMITIDAS:
                     continue
 
@@ -104,13 +147,10 @@ def main():
                     gols_totais = goals_home + goals_away
                     diferenca_gols = abs(goals_home - goals_away)
 
-                    # 🛑 TRAVA 1: Anti-Goleada (Ignora jogos resolvidos na reta final para gols)
                     jogo_goleada = (diferenca_gols >= 3 and elapsed >= 70) or (gols_totais >= 4)
-
                     chave_gol = f"{fixture_id}-{elapsed // 20}"
                     chave_canto = f"canto-{fixture_id}"
 
-                    # Só busca estatísticas se o jogo estiver ativo e interessante
                     estatisticas = buscar_estatisticas_partida(fixture_id)
                     
                     if len(estatisticas) == 2:
@@ -118,7 +158,7 @@ def main():
                         stats_away = estatisticas[1]['statistics']
 
                         shots_on_home = extrair_estatistica(stats_home, "Shots on Goal")
-                        shots_on_away = extrair_estatistica(stats_away, "Shots on Goal")
+                        shots_on_away = extrair_estatistica(stats_on_away, "Shots on Goal")
                         total_shots_home = extrair_estatistica(stats_home, "Total Shots")
                         total_shots_away = extrair_estatistica(stats_away, "Total Shots")
                         corners_home = extrair_estatistica(stats_home, "Corner Kicks")
@@ -130,9 +170,7 @@ def main():
                         total_chutes = total_shots_home + total_shots_away
                         total_escanteios = corners_home + corners_away
 
-                        # ==========================================
-                        # 1. ANÁLISE DE GOLS (Com Travas Blindadas)
-                        # ==========================================
+                        # A. Alerta de Gols com Barra Visual
                         if not jogo_goleada and chave_gol not in jogos_notificados_gols:
                             e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
                             e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
@@ -149,48 +187,58 @@ def main():
                                 else:
                                     mercado_sugerido = f"Mais de {gols_totais + 1}.5 Gols (Live)"
 
+                                barra_grafica = gerar_barra_pressao(total_chutes_alvo * 1.5 + total_chutes * 0.3)
+
                                 mensagem_gols = (
-                                    f"🚨 *OPORTUNIDADE DE GOLS (ALTA PROBABILIDADE)* 🚨\n\n"
+                                    f"🚨 *TENDÊNCIA PARA GOL* 🚨\n\n"
                                     f"🏆 *Liga:* {league}\n"
                                     f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
-                                    f"⏱️ *Momento:* {elapsed} min ({etapa})\n\n"
+                                    f"⏱️ *Alerta enviado aos* {elapsed}' • placar {goals_home}-{goals_away}\n\n"
+                                    f"📊 *Intensidade de Pressão:*\n"
+                                    f"{barra_grafica}\n\n"
                                     f"🎯 *Mercado Sugerido:* {mercado_sugerido}\n"
-                                    f"⭐ *Confiança:* Alta\n"
-                                    f"💡 *Análise Estatística & Pressão:*\n"
+                                    f"💡 *O que o robô viu:*\n"
+                                    f"⚡ Chances claras se acumulando nos últimos minutos\n"
                                     f"• Chutes no Alvo: {shots_on_home} x {shots_on_away}\n"
                                     f"• Finalizações Totais: {total_chutes}\n"
-                                    f"• Escanteios: {corners_home} x {corners_away}\n"
                                     f"• Posse de Bola: {pos_home}% x {pos_away}%\n"
-                                    f"• xG Estimado: {xg_home} x {xg_away}\n"
-                                    f"🔥 Pressão extrema e sufocante detectada!\n\n"
-                                    f"🛡️ *Canal VIP - Gestão e Disciplina Sempre.*"
+                                    f"• xG Estimado: {xg_home} x {xg_away}\n\n"
+                                    f"⚠️ Alerta estatístico baseado na leitura do jogo — não é recomendação de aposta."
                                 )
                                 
-                                enviar_telegram(mensagem_gols)
+                                msg_id = enviar_telegram(mensagem_gols)
+                                if msg_id:
+                                    sinais_ativos[fixture_id] = {
+                                        'message_id': msg_id,
+                                        'minuto_alerta': elapsed,
+                                        'gols_no_alerta': gols_totais,
+                                        'home': home,
+                                        'away': away,
+                                        'tipo': 'gols'
+                                    }
+
                                 jogos_notificados_gols.add(chave_gol)
                                 time.sleep(2)
 
-                        # ==========================================
-                        # 2. ANÁLISE EXCLUSIVA DE ESCANTEIOS (Cantos Asióticos / Pressão Lateral)
-                        # ==========================================
+                        # B. Alerta de Escanteios com Barra Visual
                         if chave_canto not in jogos_notificados_cantos:
-                            # Gatilho de escanteios no 2º tempo (entre 65 e 85 min com jogo aberto e volume alto)
                             if 65 <= elapsed <= 85 and total_escanteios >= 8:
                                 mercado_cantos = f"Mais de {total_escanteios + 2.5} Cantos (Asiáticos Live)"
+                                barra_grafica_cantos = gerar_barra_pressao(total_escanteios)
                                 
                                 mensagem_cantos = (
-                                    f"🚩 *OPORTUNIDADE DE ESCANTEIOS (PRESSÃO NAS PONTAS)* 🚩\n\n"
+                                    f"🚩 *TENDÊNCIA PARA ESCANTEIOS* 🚩\n\n"
                                     f"🏆 *Liga:* {league}\n"
                                     f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
-                                    f"⏱️ *Momento:* {elapsed} min (2º Tempo)\n\n"
+                                    f"⏱️ *Alerta enviado aos* {elapsed}' • total de cantos: {total_escanteios}\n\n"
+                                    f"📊 *Pressão Lateral:*\n"
+                                    f"{barra_grafica_cantos}\n\n"
                                     f"🎯 *Mercado Sugerido:* {mercado_cantos}\n"
-                                    f"⭐ *Confiança:* Alta (Volume Intenso)\n"
-                                    f"💡 *Raio-X de Cantos e Jogo:*\n"
-                                    f"• Escanteios Atuais: {corners_home} x {corners_away} (Total: {total_escanteios})\n"
+                                    f"💡 *O que o robô viu:*\n"
+                                    f"• Escanteios Atuais: {corners_home} x {corners_away}\n"
                                     f"• Finalizações Totais: {total_chutes}\n"
-                                    f"• Posse de Bola: {pos_home}% x {pos_away}%\n"
-                                    f"🔥 Jogo com forte tendência de cruzamentos e cantos no fim!\n\n"
-                                    f"🛡️ *Canal VIP - Gestão e Disciplina Sempre.*"
+                                    f"• Posse de Bola: {pos_home}% x {pos_away}%\n\n"
+                                    f"⚠️ Alerta estatístico de volume lateral."
                                 )
                                 
                                 enviar_telegram(mensagem_cantos)
