@@ -72,12 +72,13 @@ def extrair_estatistica(stats_team, nome_estatistica):
     return 0
 
 def main():
-    print("🤖 Robô Elite (Com Travas Anti-Goleada) iniciado!")
+    print("🤖 Robô Elite (Gols + Escanteios) iniciado!")
     
-    jogos_notificados = set()
+    jogos_notificados_gols = set()
+    jogos_notificados_cantos = set()
 
     while True:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e aplicando filtros de valor...")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e analisando Gols & Escanteios...")
         partidas = buscar_jogos_ao_vivo()
 
         for match in partidas:
@@ -103,19 +104,13 @@ def main():
                     gols_totais = goals_home + goals_away
                     diferenca_gols = abs(goals_home - goals_away)
 
-                    # 🛑 TRAVA 1: Anti-Goleada (Ignora jogos resolvidos na reta final)
-                    if diferenca_gols >= 3 and elapsed >= 70:
-                        continue
-                    
-                    # 🛑 TRAVA 2: Teto Máximo de Gols (Evita linhas irreais de over 5.5+)
-                    if gols_totais >= 4:
-                        continue
+                    # 🛑 TRAVA 1: Anti-Goleada (Ignora jogos resolvidos na reta final para gols)
+                    jogo_goleada = (diferenca_gols >= 3 and elapsed >= 70) or (gols_totais >= 4)
 
-                    chave = f"{fixture_id}-{elapsed // 20}"
-                    if chave in jogos_notificados:
-                        continue
+                    chave_gol = f"{fixture_id}-{elapsed // 20}"
+                    chave_canto = f"canto-{fixture_id}"
 
-                    # Só busca estatísticas se passou nos filtros de placar e tempo, economizando requisições da API Pro
+                    # Só busca estatísticas se o jogo estiver ativo e interessante
                     estatisticas = buscar_estatisticas_partida(fixture_id)
                     
                     if len(estatisticas) == 2:
@@ -133,44 +128,74 @@ def main():
                         
                         total_chutes_alvo = shots_on_home + shots_on_away
                         total_chutes = total_shots_home + total_shots_away
+                        total_escanteios = corners_home + corners_away
 
-                        e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
-                        e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
+                        # ==========================================
+                        # 1. ANÁLISE DE GOLS (Com Travas Blindadas)
+                        # ==========================================
+                        if not jogo_goleada and chave_gol not in jogos_notificados_gols:
+                            e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
+                            e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
 
-                        if e_primeiro_tempo or e_segundo_tempo:
-                            
-                            etapa = "1º Tempo" if elapsed <= 45 else "2º Tempo"
-                            
-                            xg_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08) + (corners_home * 0.03), 2)
-                            xg_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08) + (corners_away * 0.03), 2)
+                            if e_primeiro_tempo or e_segundo_tempo:
+                                etapa = "1º Tempo" if elapsed <= 45 else "2º Tempo"
+                                xg_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08) + (corners_home * 0.03), 2)
+                                xg_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08) + (corners_away * 0.03), 2)
 
-                            if gols_totais == 0:
-                                mercado_sugerido = "Mais de 0.5 / 1.5 Gols (Live)"
-                            elif gols_totais == 1:
-                                mercado_sugerido = "Mais de 1.5 / 2.5 Gols (Live)"
-                            else:
-                                mercado_sugerido = f"Mais de {gols_totais + 1}.5 Gols (Live)"
+                                if gols_totais == 0:
+                                    mercado_sugerido = "Mais de 0.5 / 1.5 Gols (Live)"
+                                elif gols_totais == 1:
+                                    mercado_sugerido = "Mais de 1.5 / 2.5 Gols (Live)"
+                                else:
+                                    mercado_sugerido = f"Mais de {gols_totais + 1}.5 Gols (Live)"
 
-                            mensagem = (
-                                f"🚨 *OPORTUNIDADE DE ALTA PROBABILIDADE* 🚨\n\n"
-                                f"🏆 *Liga:* {league}\n"
-                                f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
-                                f"⏱️ *Momento:* {elapsed} min ({etapa})\n\n"
-                                f"🎯 *Mercado Sugerido:* {mercado_sugerido}\n"
-                                f"⭐ *Confiança:* Alta\n"
-                                f"💡 *Análise Estatística & Pressão:*\n"
-                                f"• Chutes no Alvo: {shots_on_home} x {shots_on_away}\n"
-                                f"• Finalizações Totais: {total_chutes}\n"
-                                f"• Escanteios: {corners_home} x {corners_away}\n"
-                                f"• Posse de Bola: {pos_home}% x {pos_away}%\n"
-                                f"• xG Estimado (Volume): {xg_home} x {xg_away}\n"
-                                f"🔥 Pressão extrema e sufocante detectada!\n\n"
-                                f"🛡️ *Canal VIP - Gestão e Disciplina Sempre.*"
-                            )
-                            
-                            enviar_telegram(mensagem)
-                            jogos_notificados.add(chave)
-                            time.sleep(2)
+                                mensagem_gols = (
+                                    f"🚨 *OPORTUNIDADE DE GOLS (ALTA PROBABILIDADE)* 🚨\n\n"
+                                    f"🏆 *Liga:* {league}\n"
+                                    f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
+                                    f"⏱️ *Momento:* {elapsed} min ({etapa})\n\n"
+                                    f"🎯 *Mercado Sugerido:* {mercado_sugerido}\n"
+                                    f"⭐ *Confiança:* Alta\n"
+                                    f"💡 *Análise Estatística & Pressão:*\n"
+                                    f"• Chutes no Alvo: {shots_on_home} x {shots_on_away}\n"
+                                    f"• Finalizações Totais: {total_chutes}\n"
+                                    f"• Escanteios: {corners_home} x {corners_away}\n"
+                                    f"• Posse de Bola: {pos_home}% x {pos_away}%\n"
+                                    f"• xG Estimado: {xg_home} x {xg_away}\n"
+                                    f"🔥 Pressão extrema e sufocante detectada!\n\n"
+                                    f"🛡️ *Canal VIP - Gestão e Disciplina Sempre.*"
+                                )
+                                
+                                enviar_telegram(mensagem_gols)
+                                jogos_notificados_gols.add(chave_gol)
+                                time.sleep(2)
+
+                        # ==========================================
+                        # 2. ANÁLISE EXCLUSIVA DE ESCANTEIOS (Cantos Asióticos / Pressão Lateral)
+                        # ==========================================
+                        if chave_canto not in jogos_notificados_cantos:
+                            # Gatilho de escanteios no 2º tempo (entre 65 e 85 min com jogo aberto e volume alto)
+                            if 65 <= elapsed <= 85 and total_escanteios >= 8:
+                                mercado_cantos = f"Mais de {total_escanteios + 2.5} Cantos (Asiáticos Live)"
+                                
+                                mensagem_cantos = (
+                                    f"🚩 *OPORTUNIDADE DE ESCANTEIOS (PRESSÃO NAS PONTAS)* 🚩\n\n"
+                                    f"🏆 *Liga:* {league}\n"
+                                    f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
+                                    f"⏱️ *Momento:* {elapsed} min (2º Tempo)\n\n"
+                                    f"🎯 *Mercado Sugerido:* {mercado_cantos}\n"
+                                    f"⭐ *Confiança:* Alta (Volume Intenso)\n"
+                                    f"💡 *Raio-X de Cantos e Jogo:*\n"
+                                    f"• Escanteios Atuais: {corners_home} x {corners_away} (Total: {total_escanteios})\n"
+                                    f"• Finalizações Totais: {total_chutes}\n"
+                                    f"• Posse de Bola: {pos_home}% x {pos_away}%\n"
+                                    f"🔥 Jogo com forte tendência de cruzamentos e cantos no fim!\n\n"
+                                    f"🛡️ *Canal VIP - Gestão e Disciplina Sempre.*"
+                                )
+                                
+                                enviar_telegram(mensagem_cantos)
+                                jogos_notificados_cantos.add(chave_canto)
+                                time.sleep(2)
 
             except Exception as e:
                 continue
