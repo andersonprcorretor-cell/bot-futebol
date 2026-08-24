@@ -9,13 +9,14 @@ API_KEY = os.getenv("API_KEY")
 
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
-# IDs das principais ligas de elite
+# IDs das principais ligas de elite e copas
 LIGAS_PERMITIDAS = {
     71, 72,    # Brasileirão Série A e B
     39, 40,    # Premier League e Championship (Inglaterra)
     140, 141,  # La Liga e La Liga 2 (Espanha)
     135,       # Serie A (Itália)
     78,        # Bundesliga (Alemanha)
+    81,        # DFB-Pokal (Copa da Alemanha) 👈 ADICIONADO AQUI!
     61,        # Ligue 1 (França)
     2,         # UEFA Champions League
     3,         # UEFA Europa League
@@ -78,7 +79,6 @@ def extrair_estatistica(stats_team, nome_estatistica):
     return 0
 
 def gerar_barra_pressao(valor_total):
-    # Cria uma barra de 10 blocos baseada no volume de finalizações/chutes
     pontos = min(max(int(valor_total), 1), 10)
     preenchido = "█" * pontos
     vazio = "░" * (10 - pontos)
@@ -86,7 +86,7 @@ def gerar_barra_pressao(valor_total):
     return f"`{preenchido}{vazio}` ({porcentagem}%)"
 
 def main():
-    print("🤖 Robô Elite (Gols + Escanteios + Gráfico Visual) iniciado!")
+    print("🤖 Robô Elite (Gols + Escanteios + Copa da Alemanha) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
@@ -158,7 +158,7 @@ def main():
                         stats_away = estatisticas[1]['statistics']
 
                         shots_on_home = extrair_estatistica(stats_home, "Shots on Goal")
-                        shots_on_away = extrair_estatistica(stats_on_away, "Shots on Goal")
+                        shots_on_away = extrair_estatistica(stats_away, "Shots on Goal")
                         total_shots_home = extrair_estatistica(stats_home, "Total Shots")
                         total_shots_away = extrair_estatistica(stats_away, "Total Shots")
                         corners_home = extrair_estatistica(stats_home, "Corner Kicks")
