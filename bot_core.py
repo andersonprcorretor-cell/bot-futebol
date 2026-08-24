@@ -9,7 +9,7 @@ API_KEY = os.getenv("API_KEY")
 
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
-# IDs das principais ligas de elite (Futebol nacional e internacional de alto volume)
+# IDs das principais ligas de elite
 LIGAS_PERMITIDAS = {
     71, 72,    # Brasileirão Série A e B
     39, 40,    # Premier League e Championship (Inglaterra)
@@ -72,12 +72,12 @@ def extrair_estatistica(stats_team, nome_estatistica):
     return 0
 
 def main():
-    print("🤖 Robô Elite (Com Rodapé Profissional) iniciado!")
+    print("🤖 Robô Elite (Com Travas Anti-Goleada) iniciado!")
     
     jogos_notificados = set()
 
     while True:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e aplicando filtro de elite...")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Varrendo partidas e aplicando filtros de valor...")
         partidas = buscar_jogos_ao_vivo()
 
         for match in partidas:
@@ -100,10 +100,22 @@ def main():
                 if goals_away is None: goals_away = 0
 
                 if elapsed:
+                    gols_totais = goals_home + goals_away
+                    diferenca_gols = abs(goals_home - goals_away)
+
+                    # 🛑 TRAVA 1: Anti-Goleada (Ignora jogos resolvidos na reta final)
+                    if diferenca_gols >= 3 and elapsed >= 70:
+                        continue
+                    
+                    # 🛑 TRAVA 2: Teto Máximo de Gols (Evita linhas irreais de over 5.5+)
+                    if gols_totais >= 4:
+                        continue
+
                     chave = f"{fixture_id}-{elapsed // 20}"
                     if chave in jogos_notificados:
                         continue
 
+                    # Só busca estatísticas se passou nos filtros de placar e tempo, economizando requisições da API Pro
                     estatisticas = buscar_estatisticas_partida(fixture_id)
                     
                     if len(estatisticas) == 2:
@@ -132,7 +144,6 @@ def main():
                             xg_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08) + (corners_home * 0.03), 2)
                             xg_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08) + (corners_away * 0.03), 2)
 
-                            gols_totais = goals_home + goals_away
                             if gols_totais == 0:
                                 mercado_sugerido = "Mais de 0.5 / 1.5 Gols (Live)"
                             elif gols_totais == 1:
