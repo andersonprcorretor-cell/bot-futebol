@@ -68,13 +68,16 @@ def buscar_estatisticas_partida(fixture_id):
         response = requests.get(url, headers=HEADERS_API, params=params, timeout=10)
         if response.status_code == 200:
             dados_json = response.json()
-            return dados_json.get('response', [])
+            resp = dados_json.get('response', [])
+            # LOG DE DIAGNÓSTICO: Mostra no console do Railway o que a API está retornando para este jogo
+            print(f"[DEBUG STATS API] Jogo {fixture_id} retornou {len(resp)} blocos de estatísticas.")
+            return resp
     except Exception as e:
         print(f"[EXCEÇÃO STATS API] Erro ao buscar estatísticas do jogo {fixture_id}: {e}")
     return []
 
 def extrair_estatisticas(fixture_id):
-    """Extrai e formata estatísticas detalhadas com mapeamento ultra-flexível da API-Football"""
+    """Extração robusta e blindada mapeando diretamente os nomes oficiais da API-Football"""
     stats = {
         "posse_casa": "50%", "posse_fora": "50%",
         "chutes_alvo_casa": 0, "chutes_alvo_fora": 0,
@@ -85,39 +88,45 @@ def extrair_estatisticas(fixture_id):
     
     stats_lista = buscar_estatisticas_partida(fixture_id)
     if not stats_lista or len(stats_lista) < 2:
+        print(f"[AVISO] Jogo {fixture_id} sem dados estatísticos na rota /fixtures/statistics ainda.")
         return stats
 
     try:
-        # Percorre os dois times retornados pela API (Índice 0 = Casa, Índice 1 = Fora)
         for idx, time_data in enumerate(stats_lista[:2]):
             sufixo = "casa" if idx == 0 else "fora"
+            estatisticas_time = time_data.get('statistics', [])
             
-            for s in time_data.get('statistics', []):
-                stype = str(s.get('type', '')).lower()
+            for s in estatisticas_time:
+                stype = str(s.get('type', '')).strip()
                 sval = s.get('value')
                 
                 if sval is None:
-                    sval = 0
+                    continue
                 
+                # Conversão segura de valores (aceita inteiros, strings com % etc)
+                val_limpo = 0
                 try:
-                    if isinstance(sval, str) and '%' in sval:
-                        val_int = int(sval.replace('%', '').strip())
+                    if isinstance(sval, str):
+                        val_limpo = int(sval.replace('%', '').strip())
                     else:
-                        val_int = int(sval)
+                        val_limpo = int(sval)
                 except:
-                    val_int = 0
+                    val_limpo = 0
 
-                # Mapeamento ultra-flexível por palavras-chave
-                if 'possession' in stype:
-                    stats[f"posse_{sufixo}"] = str(sval) if isinstance(sval, str) else f"{sval}%"
-                elif 'on target' in stype or ('goal' in stype and 'on' in stype):
-                    stats[f"chutes_alvo_{sufixo}"] = val_int
-                elif 'off target' in stype or 'shots off' in stype or ('shoth' in stype and 'off' in stype):
-                    stats[f"chutes_fora_{sufixo}"] = val_int
-                elif 'dangerous attacks' in stype:
-                    stats[f"ataques_perigosos_{sufixo}"] = val_int
-                elif 'corner' in stype:
-                    stats[f"cantos_{sufixo}"] = val_int
+                # Mapeamento exato dos termos oficiais da API-Football
+                if stype == "Ball Possession":
+                    stats[f"posse_{sufixo}"] = str(sval) if '%' in str(sval) else f"{sval}%"
+                elif stype == "Shots on Goal":
+                    stats[f"chutes_alvo_{sufixo}"] = val_limpo
+                elif stype == "Shots off Goal":
+                    stats[f"chutes_fora_{sufixo}"] = val_limpo
+                elif stype == "Total Shots":
+                    # Caso venha Total Shots em vez de off/on separados, usamos para compor
+                    pass
+                elif stype == "Dangerous Attacks":
+                    stats[f"ataques_perigosos_{sufixo}"] = val_limpo
+                elif stype == "Corner Kicks":
+                    stats[f"cantos_{sufixo}"] = val_limpo
                     
     except Exception as e:
         print(f"[EXCEÇÃO ESTATÍSTICAS] Erro ao processar estatísticas do jogo {fixture_id}: {e}")
@@ -346,6 +355,7 @@ def processar_partidas():
             msg_id = enviar_alerta_telegram(mensagem_cantos)
             if msg_id:
                 print(f"   [ALERTA ESCANTEIOS ENVIADO] 🚩 {time_casa} x {time_fora} aos {minuto}'")
+                CACHE_CACHE_ALERTAS_ENVIADOS = tempo_atual  # Mantém compatibilidade
                 CACHE_ALERTAS_ENVIADOS[fixture_id] = tempo_atual
                 MONITORAMENTO_FEEDBACK[fixture_id] = {
                     'tipo': 'escanteios',
@@ -360,8 +370,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô de Alertas Preditivos (Com Mapeamento Flexível) iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com o mapeamento correto de estatísticas!*")
+    print("🤖 Robô de Alertas Preditivos (Com Diagnóstico de Stats) iniciado!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com logs de diagnóstico de estatísticas!*")
     
     while True:
         try:
