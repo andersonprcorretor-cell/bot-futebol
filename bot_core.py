@@ -93,7 +93,7 @@ def processar_partidas():
             CONTROLE_GOLS[fixture_id]['minuto_ultimo_gol'] = minuto
             continue # Pula a análise para este jogo neste ciclo
         
-        # Atualiza o total de gols caso tenha mudado sem passar pela verificação estrita (ex: reinício de loop)
+        # Atualiza o total de gols caso tenha mudado sem passar pela verificação estrita
         CONTROLE_GOLS[fixture_id]['total_gols'] = total_gols_atual
         
         minuto_do_ultimo_gol = CONTROLE_GOLS[fixture_id]['minuto_ultimo_gol']
@@ -101,7 +101,7 @@ def processar_partidas():
         # TRAVA DE SEGURANÇA: Se o gol saiu há menos de 4 minutos, proíbe qualquer sinal preditivo
         if (minuto - minuto_do_ultimo_gol) < 4:
             continue
-        ------------------------------------------
+        # ------------------------------------------
         
         # Filtro de gatilho: disparar quando o jogo estiver no segundo tempo (ex: entre 60' e 80')
         condicao_gatilho = (status_short in ['2H'] and 60 <= minuto <= 80)
