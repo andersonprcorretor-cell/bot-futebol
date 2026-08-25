@@ -31,7 +31,7 @@ def enviar_alerta_telegram(mensagem):
     except Exception as e:
         print(f"[EXCEÇÃO TELEGRAM] Erro ao enviar mensagem: {e}")
 
-def buscar_jogos_ao vivo():
+def buscar_jogos_ao_vivo():
     """Busca partidas em andamento na API-Football"""
     url = "https://v3.football.api-sports.io/fixtures"
     params = {"live": "all"}
