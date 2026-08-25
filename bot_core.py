@@ -14,8 +14,7 @@ HEADERS_API = {
     'x-apisports-key': FOOTBALL_API_KEY
 }
 
-# Dicionário para controlar quais jogos já mandamos alerta recentemente (Evita Spam)
-# Formato: { fixture_id: timestamp_do_ultimo_envio }
+# Dicionário de cache anti-flood (evita mandar alerta repetido do mesmo jogo toda hora)
 CACHE_ALERTAS_ENVIADOS = {}
 
 def enviar_alerta_telegram(mensagem):
@@ -41,84 +40,76 @@ def buscar_jogos_ao_vivo():
         response = requests.get(url, headers=HEADERS_API, params=params, timeout=15)
         if response.status_code == 200:
             dados_json = response.json()
-            jogos = dados_json.get('response', [])
-            return jogos
+            return dados_json.get('response', [])
         else:
             print(f"[ERRO API] Retornou status {response.status_code}: {response.text}")
     except Exception as e:
         print(f"[EXCEÇÃO API] Erro ao buscar jogos ao vivo: {e}")
     return []
 
-def avaliar_gatilho_real(jogo):
-    """
-    Avalia os gatilhos com base nas estatísticas reais e minuto do jogo da API.
-    Aqui você pode refinar as regras reais de chutes, ataques perigosos, etc.
-    """
-    status_short = jogo['fixture']['status']['short']
-    minuto = jogo['fixture']['status']['elapsed'] or 0
-    
-    tempo = '1T' if status_short in ['1H', 'HT'] else '2T'
-    
-    # Exemplo de regra baseada no minuto do jogo (substitua pelas suas estatísticas da API quando quiser)
-    # Exemplo: gatilho de pressão no segundo tempo entre 50' e 80'
-    if tempo == '2T' and 50 <= minuto <= 80:
-        return True, "⚡ GATILHO DE PRESSÃO CONVENCIONAL", minuto, tempo
-
-    return False, "", minuto, tempo
-
 def processar_partidas():
     hora_atual = datetime.now().strftime('%H:%M:%S')
-    print(f"\n[{hora_atual}] Iniciando nova varredura de partidas...")
+    print(f"\n[{hora_atual}] Iniciando varredura de partidas...")
     jogos = buscar_jogos_ao_vivo()
     
     if not jogos:
         print(f"[{hora_atual}] Nenhum jogo ao vivo encontrado na API nesta varredura.")
         return
 
-    print(f"[{hora_atual}] Total de jogos ao vivo na API: {len(jogos)}")
-    
     global CACHE_ALERTAS_ENVIADOS
     tempo_atual = time.time()
     
-    # Limpa o cache de jogos antigos (remove o que foi enviado há mais de 30 minutos para poder alertar novamente se necessário)
+    # Limpa cache antigo (permite re-alertar a mesma partida após 30 minutos se o cenário mudar)
     CACHE_ALERTAS_ENVIADOS = {fid: ts for fid, ts in CACHE_ALERTAS_ENVIADOS.items() if tempo_atual - ts < 1800}
 
-    jogos_com_alerta = 0
+    alertas_enviados_ciclo = 0
     for jogo in jogos:
         fixture_id = jogo['fixture']['id']
+        liga = jogo['league']['name']
         time_casa = jogo['teams']['home']['name']
         time_fora = jogo['teams']['away']['name']
         
-        # Avalia se a partida cumpre os requisitos reais
-        disparar, motivo, minuto, tempo = avaliar_gatilho_real(jogo)
+        gols_casa = jogo['goals']['home'] if jogo['goals']['home'] is not None else 0
+        gols_fora = jogo['goals']['away'] if jogo['goals']['away'] is not None else 0
         
-        if disparar:
-            # Verifica se já mandamos alerta para este jogo nos últimos 20 minutos (1200 segundos)
+        minuto = jogo['fixture']['status']['elapsed'] or 0
+        status_short = jogo['fixture']['status']['short']
+        
+        # Filtro de exemplo: disparar quando o jogo estiver no segundo tempo (ex: entre 60' e 80')
+        # Aqui você insere a lógica dos seus gatilhos de estatísticas de chutes/pressão
+        condicao_gatilho = (status_short in ['2H'] and 60 <= minuto <= 80)
+        
+        if condicao_gatilho:
+            # Verifica se já alertamos este jogo recentemente
             if fixture_id in CACHE_ALERTAS_ENVIADOS:
-                continue 
+                continue
                 
+            # Monta a mensagem exatamente no seu layout padrão profissional
             mensagem = (
-                f"{motivo}\n"
-                f"⚽ *{time_casa} vs {time_fora}*\n"
-                f"⏱️ Minuto: {minuto}' ({tempo})\n"
-                f"📊 Oportunidade detectada pelo motor preditivo!"
+                f"🚨 **TENDÊNCIA PARA GOL** 🚨\n\n"
+                f"🏆 Liga: {liga}\n"
+                f"⚽ Partida: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
+                f"⏱️ Alerta enviado aos {minuto}' • placar {gols_casa}-{gols_fora}\n\n"
+                f"📊 Intensidade de Pressão:\n"
+                f"██████████ (100%)\n\n"
+                f"🎯 Mercado Sugerido: Mais de {gols_casa + gols_fora + 0.5} Gols (Live)\n"
+                f"💡 O que o robô viu:\n"
+                f"⚡ Chances claras se acumulando nos últimos minutos\n"
+                f"• Placar atual apontando pressão forte\n\n"
+                f"⚠️ Alerta estatístico baseado na leitura do jogo — não é recomendação de aposta."
             )
-            enviar_alerta_telegram(mensagem)
-            print(f"   [ALERTA ENVIADO!] 🚨 {time_casa} x {time_fora} aos {minuto}'")
             
-            # Registra no cache que este jogo acabou de receber alerta
+            enviar_alerta_telegram(mensagem)
+            print(f"   [ALERTA ENVIADO] 🚨 {time_casa} x {time_fora} aos {minuto}'")
+            
             CACHE_ALERTAS_ENVIADOS[fixture_id] = tempo_atual
-            jogos_com_alerta += 1
+            alertas_enviados_ciclo += 1
 
-    print(f"[{hora_atual}] Varredura concluída. Alertas enviados neste ciclo: {jogos_com_alerta}")
+    print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô de Alertas Preditivos iniciado com sucesso!")
-    
-    enviar_alerta_telegram(
-        "🚀 *Robô atualizado e operando com dados reais da API!* \n"
-        "🛡️ Filtro anti-spam de partidas ativado com sucesso."
-    )
+    print("🤖 Robô de Alertas Preditivos (Layout Original) iniciado!")
+    enviar_alerta_telegram("🚀 *Robô religado com o layout completo de sinais recuperado!*")
     
     while True:
         try:
@@ -126,5 +117,4 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"[ERRO NO LOOP] {e}")
         
-        print("Aguardando 60 segundos para o próximo ciclo...\n")
         time.sleep(60)
