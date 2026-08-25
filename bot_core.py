@@ -152,13 +152,13 @@ def enviar_relatorio_diario():
     print("📢 Relatório diário enviado com sucesso!")
 
 def main():
-    print("🤖 Robô Elite (Com Trava Pós-Gol e Correção de Linhas) iniciado!")
+    print("🤖 Robô Elite (Com Trava Pós-Gol Rigorosa e Horário Real do Gol) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
     sinais_ativos = {} 
     
-    # Dicionário para rastrear o minuto exato do último gol de cada partida (Trava pós-gol)
+    # Dicionário para rastrear o minuto exato do último gol de cada partida
     controle_ultimo_gol = {} 
 
     ultimo_dia_relatorio = datetime.now().date()
@@ -189,7 +189,7 @@ def main():
             gols_totais_atual = g_home + g_away
             elapsed_atual = match_atual['fixture']['status']['elapsed'] or 0
 
-            # Atualiza o rastreador de gols da partida para a trava pós-gol funcionar globalmente
+            # Atualiza o rastreador de gols da partida em tempo real
             gols_anteriores_registrados = controle_ultimo_gol.get(fixture_id, {}).get("total_gols", 0)
             if gols_totais_atual > gols_anteriores_registrados:
                 controle_ultimo_gol[fixture_id] = {
@@ -199,7 +199,9 @@ def main():
 
             # Tratamento para Gols (Múltiplos Greens sequenciais)
             if info['tipo'] == 'gols' and gols_totais_atual > info['gols_no_alerta']:
-                tempo_para_agir = elapsed_atual - info['minuto_alerta']
+                # Puxa o minuto exato que o gol aconteceu na partida, evitando o atraso do loop
+                minuto_real_do_gol = controle_ultimo_gol.get(fixture_id, {}).get("minuto_gol", elapsed_atual)
+                tempo_para_agir = minuto_real_do_gol - info['minuto_alerta']
                 if tempo_para_agir < 0: 
                     tempo_para_agir = 1
 
@@ -207,7 +209,7 @@ def main():
                     f"🟢 *GOL CONFIRMADO depois do alerta!*\n"
                     f"⚽ {info['home']} {g_home} x {g_away} {info['away']} • Placar Atual\n"
                     f"⏱️ Alerta enviado aos {info['minuto_alerta']}'\n"
-                    f"⚽ Gol saiu aos {elapsed_atual}'\n"
+                    f"⚽ Gol saiu aos {minuto_real_do_gol}'\n"
                     f"⏳ Você teve {tempo_para_agir} minutos para agir!"
                 )
                 enviar_telegram(feedback_msg, reply_to_message_id=info['message_id'])
@@ -283,7 +285,7 @@ def main():
                     chave_canto = f"canto-{fixture_id}"
 
                     # ==========================================
-                    # TRAVA PÓS-GOL: Proíbe alerta de gol se houve gol nos últimos 10 minutos
+                    # TRAVA PÓS-GOL: Proíbe alerta se houve gol nos últimos 10 minutos
                     # ==========================================
                     minuto_ultimo_gol = info_gol_partida["minuto_gol"]
                     teve_gol_recente = (elapsed - minuto_ultimo_gol) <= 10
@@ -307,13 +309,13 @@ def main():
                         total_chutes = total_shots_home + total_shots_away
                         total_escanteios = corners_home + corners_away
 
-                        # A. Alerta de Gols (Com a nova trava anti-pós-gol e cálculo de mercado corrigido)
+                        # A. Alerta de Gols (Com trava pós-gol + mercado ajustado)
                         if not jogo_goleada and not teve_gol_recente and chave_gol not in jogos_notificados_gols:
                             e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
                             e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
 
                             if e_primeiro_tempo or e_segundo_tempo:
-                                # Validação dupla de segurança contra alteração de placar instantânea
+                                # Validação dupla de segurança
                                 match_recheck = [m for m in buscar_jogos_ao_vivo() if m['fixture']['id'] == fixture_id]
                                 if match_recheck:
                                     g_h_check = match_recheck[0]['goals']['home'] or 0
@@ -325,11 +327,10 @@ def main():
                                 xg_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08) + (corners_home * 0.03), 2)
                                 xg_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08) + (corners_away * 0.03), 2)
 
-                                # CÁLCULO DE MERCADO CORRIGIDO E SEGURO
+                                # Mercado Corrigido (Ex: 3 gols = Mais de 3.5 Gols)
                                 if gols_totais == 0:
                                     mercado_sugerido = "Mais de 0.5 / 1.5 Gols (Live)"
                                 else:
-                                    # Se está 2x1 (3 gols), sugere Mais de 3.5 Gols (gols_totais + 0.5)
                                     mercado_sugerido = f"Mais de {gols_totais}.5 Gols (Live)"
 
                                 barra_grafica = gerar_barra_pressao(total_chutes_alvo * 1.5 + total_chutes * 0.3)
