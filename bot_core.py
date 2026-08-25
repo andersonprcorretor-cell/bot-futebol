@@ -178,7 +178,7 @@ def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
 
 def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, tipo="gols"):
     if not client_ai:
-        return 8, f"• O confronto entre {time_casa} e {time_fora} exibe alta intensidade e volume ofensivo constante.\n• As estatísticas apontam oportunidades claras para o mercado de {tipo} nesta etapa."
+        return 8, f"• O volume ofensivo apresentado por {time_casa} e {time_fora} demonstra clara pressão territorial.\n• Os indicadores estatísticos sustentam a expectativa de movimentação no placar."
     
     resumo_stats = (
         f"Estatísticas - Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
@@ -191,12 +191,17 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
     )
 
     prompt = (
-        f"Atue como um analista estatístico profissional de apostas Live de elite. "
-        f"Analise o jogo para o mercado de {tipo.upper()}: {liga} | {time_casa} {gols_casa} x {gols_fora} {time_fora} aos {minuto}' do {periodo_etapa}.\n"
-        f"Dados de campo:\n{resumo_stats}\n\n"
-        f"Forneça estritamente:\n"
-        f"1. Uma nota numérica inteira de 1 a 10 para o nível de pressão atual na primeira linha (apenas o número, ex: '9').\n"
-        f"2. Um texto curto em 2 linhas começando com '•' explicando a tendência de forma 100% personalizada e única para este cenário de jogo."
+        f"Atue obrigatoriamente como um analista estatístico profissional e especialista em apostas esportivas Live de alto nível. "
+        f"Analise detalhadamente o cenário atual da partida para o mercado de {tipo.upper()}:\n"
+        f"Competição: {liga}\n"
+        f"Confronto: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
+        f"Momento: Aos {minuto}' minutos do {periodo_etapa}.\n"
+        f"Estatísticas atuais em campo:\n{resumo_stats}\n\n"
+        f"Instruções estritas para a resposta:\n"
+        f"1. Na PRIMEIRA linha, forneça apenas um número inteiro de 1 a 10 representando a intensidade da pressão atual (exemplo: '9').\n"
+        f"2. Nas linhas seguintes, elabore uma análise crítica, profunda e 100% personalizada sobre o jogo (evite frases genéricas ou repetitivas). "
+        f"Cite diretamente os números de finalizações, pressão territorial ou volume ofensivo dos times para justificar a tendência do mercado de {tipo}. "
+        f"Utilize formato de tópicos com marcadores '•' (máximo de 2 a 3 linhas objetivas e analíticas)."
     )
     
     try:
@@ -205,22 +210,32 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
             contents=prompt
         )
         texto_resposta = response.text.strip()
-        linhas = texto_resposta.split('\n')
+        linhas = [l.strip() for l in texto_resposta.split('\n') if l.strip()]
         
         nota_num = 8
-        for char in linhas[0]:
-            if char.isdigit():
-                nota_num = int(char)
-                break
+        indice_inicio_texto = 0
+        
+        if linhas:
+            for char in linhas[0]:
+                if char.isdigit():
+                    nota_num = int(char)
+                    indice_inicio_texto = 1
+                    break
         nota_num = max(1, min(10, nota_num))
         
-        analise_linhas = "\n".join([l for l in linhas[1:] if l.strip()])
+        analise_linhas = "\n".join(linhas[indice_inicio_texto:])
         if not analise_linhas:
-            analise_linhas = f"• O volume ofensivo de {time_casa} e {time_fora} justifica a leitura técnica para o momento.\n• Padrão de finalizações consistente com a faixa de tempo."
+            analise_linhas = (
+                f"• O volume ofensivo de {time_casa} com {estats['chutes_totais_casa']} finalizações pressiona a defesa adversária.\n"
+                f"• A dinâmica aos {minuto}' do {periodo_etapa} evidencia alta probabilidade de oportunidades reais no setor."
+            )
         return nota_num, analise_linhas
     except Exception as e:
-        print(f"[EXCEÇÃO IA] Erro ao gerar análise: {e}")
-        return 8, f"• Dinâmica de jogo intensa entre {time_casa} e {time_fora} no setor intermediário.\n• Indicadores reais de pressão sustentam o alerta atual."
+        print(f"[EXCEÇÃO IA] Erro detalhado ao gerar análise com Gemini: {e}")
+        return 8, (
+            f"• A intensidade do confronto entre {time_casa} e {time_fora} gera volume constante no setor ofensivo.\n"
+            f"• Os dados de finalizações e pressão aos {minuto}' sustentam o padrão estatístico esperado."
+        )
 
 def processar_partidas():
     hora_atual = datetime.now().strftime('%H:%M:%S')
