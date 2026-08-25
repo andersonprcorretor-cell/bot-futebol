@@ -152,7 +152,7 @@ def enviar_relatorio_diario():
     print("📢 Relatório diário enviado com sucesso!")
 
 def main():
-    print("🤖 Robô Elite (Com Trava Pós-Gol Rigorosa e Horário Real do Gol) iniciado!")
+    print("🤖 Robô Elite (Com Correção de Horário Real e Múltiplos Gols) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
@@ -197,9 +197,9 @@ def main():
                     "minuto_gol": elapsed_atual
                 }
 
-            # Tratamento para Gols (Múltiplos Greens sequenciais)
+            # Tratamento para Gols (Múltiplos Greens sequenciais na mesma partida)
             if info['tipo'] == 'gols' and gols_totais_atual > info['gols_no_alerta']:
-                # Puxa o minuto exato que o gol aconteceu na partida, evitando o atraso do loop
+                # Puxa o minuto exato real do gol gravado na API (evita o atraso do loop)
                 minuto_real_do_gol = controle_ultimo_gol.get(fixture_id, {}).get("minuto_gol", elapsed_atual)
                 tempo_para_agir = minuto_real_do_gol - info['minuto_alerta']
                 if tempo_para_agir < 0: 
@@ -214,6 +214,8 @@ def main():
                 )
                 enviar_telegram(feedback_msg, reply_to_message_id=info['message_id'])
                 estatisticas_diarias["gols_green"] += 1
+                
+                # Atualiza a referência para capturar o próximo gol (ex: o gol de empate)
                 info['gols_no_alerta'] = gols_totais_atual
                 
                 if elapsed_atual >= 90:
