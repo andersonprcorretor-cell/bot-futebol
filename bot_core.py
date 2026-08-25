@@ -17,6 +17,10 @@ HEADERS_API = {
 # Dicionário de cache anti-flood (evita mandar alerta repetido do mesmo jogo toda hora)
 CACHE_ALERTAS_ENVIADOS = {}
 
+# Dicionário para rastrear o último placar conhecido e o momento do último gol de cada partida
+# Formato: { fixture_id: {'total_gols': int, 'minuto_ultimo_gol': int} }
+CONTROLE_GOLS = {}
+
 def enviar_alerta_telegram(mensagem):
     """Envia o alerta formatado para o chat do Telegram"""
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -56,7 +60,7 @@ def processar_partidas():
         print(f"[{hora_atual}] Nenhum jogo ao vivo encontrado na API nesta varredura.")
         return
 
-    global CACHE_ALERTAS_ENVIADOS
+    global CACHE_ALERTAS_ENVIADOS, CONTROLE_GOLS
     tempo_atual = time.time()
     
     # Limpa cache antigo (permite re-alertar a mesma partida após 30 minutos se o cenário mudar)
@@ -71,12 +75,35 @@ def processar_partidas():
         
         gols_casa = jogo['goals']['home'] if jogo['goals']['home'] is not None else 0
         gols_fora = jogo['goals']['away'] if jogo['goals']['away'] is not None else 0
+        total_gols_atual = gols_casa + gols_fora
         
         minuto = jogo['fixture']['status']['elapsed'] or 0
         status_short = jogo['fixture']['status']['short']
         
-        # Filtro de exemplo: disparar quando o jogo estiver no segundo tempo (ex: entre 60' e 80')
-        # Aqui você insere a lógica dos seus gatilhos de estatísticas de chutes/pressão
+        # --- TRAVA ANTI-GOL / COOLDOWN PÓS-GOL ---
+        if fixture_id not in CONTROLE_GOLS:
+            CONTROLE_GOLS[fixture_id] = {'total_gols': total_gols_atual, 'minuto_ultimo_gol': -99}
+            
+        estado_jogo = CONTROLE_GOLS[fixture_id]
+        
+        # Se o placar aumentou em relação à última varredura, um gol acabou de acontecer!
+        if total_gols_atual > estado_jogo['total_gols']:
+            print(f"   [GOL DETECTADO] ⚽ {time_casa} x {time_fora} marcou aos {minuto}'. Ativando trava de segurança pós-gol.")
+            CONTROLE_GOLS[fixture_id]['total_gols'] = total_gols_atual
+            CONTROLE_GOLS[fixture_id]['minuto_ultimo_gol'] = minuto
+            continue # Pula a análise para este jogo neste ciclo
+        
+        # Atualiza o total de gols caso tenha mudado sem passar pela verificação estrita (ex: reinício de loop)
+        CONTROLE_GOLS[fixture_id]['total_gols'] = total_gols_atual
+        
+        minuto_do_ultimo_gol = CONTROLE_GOLS[fixture_id]['minuto_ultimo_gol']
+        
+        # TRAVA DE SEGURANÇA: Se o gol saiu há menos de 4 minutos, proíbe qualquer sinal preditivo
+        if (minuto - minuto_do_ultimo_gol) < 4:
+            continue
+        ------------------------------------------
+        
+        # Filtro de gatilho: disparar quando o jogo estiver no segundo tempo (ex: entre 60' e 80')
         condicao_gatilho = (status_short in ['2H'] and 60 <= minuto <= 80)
         
         if condicao_gatilho:
@@ -92,7 +119,7 @@ def processar_partidas():
                 f"⏱️ Alerta enviado aos {minuto}' • placar {gols_casa}-{gols_fora}\n\n"
                 f"📊 Intensidade de Pressão:\n"
                 f"██████████ (100%)\n\n"
-                f"🎯 Mercado Sugerido: Mais de {gols_casa + gols_fora + 0.5} Gols (Live)\n"
+                f"🎯 Mercado Sugerido: Mais de {total_gols_atual + 0.5} Gols (Live)\n"
                 f"💡 O que o robô viu:\n"
                 f"⚡ Chances claras se acumulando nos últimos minutos\n"
                 f"• Placar atual apontando pressão forte\n\n"
@@ -108,8 +135,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô de Alertas Preditivos (Layout Original) iniciado!")
-    enviar_alerta_telegram("🚀 *Robô religado com o layout completo de sinais recuperado!*")
+    print("🤖 Robô de Alertas Preditivos (Com Trava Anti-Gol) iniciado!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com blindagem anti-gol pós-evento ativada!*")
     
     while True:
         try:
