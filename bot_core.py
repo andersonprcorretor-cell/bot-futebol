@@ -85,8 +85,8 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         )
         texto_resposta = response.text.strip()
         
-        # Processamento simples para extrair os blocos gerados pela IA
-linhas = texto_resposta.split('\n')
+        # Processamento simples para extrair os blocos gerados pela IA (corrigido)
+        linhas = texto_resposta.split('\n')
         intensidade = linhas[0] if len(linhas) > 0 else "██████████ (100%)"
         analise_linhas = "\n".join([l for l in linhas[1:] if l.strip()])
         if not analise_linhas:
