@@ -86,16 +86,15 @@ def buscar_estatisticas_partida(fixture_id):
     return []
 
 def extrair_estatisticas(fixture_id):
-    """Extração robusta incluindo xG, xGOT, finalizações qualificadas e ataques perigosos"""
+    """Extração clássica e robusta focada nos parâmetros reais de campo"""
     stats = {
         "posse_casa": "50%", "posse_fora": "50%",
         "chutes_alvo_casa": 0, "chutes_alvo_fora": 0,
         "chutes_fora_casa": 0, "chutes_fora_fora": 0,
+        "chutes_totais_casa": 0, "chutes_totais_fora": 0,
         "chutes_dentro_area_casa": 0, "chutes_dentro_area_fora": 0,
         "ataques_perigosos_casa": 0, "ataques_perigosos_fora": 0,
         "cantos_casa": 0, "cantos_fora": 0,
-        "xg_casa": "0.00", "xg_fora": "0.00",
-        "xgot_casa": "0.00", "xgot_fora": "0.00",
         "dados_validos": False
     }
     
@@ -116,11 +115,9 @@ def extrair_estatisticas(fixture_id):
                     continue
                 
                 val_limpo = 0
-                val_float = 0.0
                 try:
                     val_str = str(sval).replace('%', '').strip()
                     val_limpo = int(float(val_str))
-                    val_float = float(val_str)
                 except:
                     pass
 
@@ -132,6 +129,8 @@ def extrair_estatisticas(fixture_id):
                     stats["dados_validos"] = True
                 elif "shots off goal" in stype:
                     stats[f"chutes_fora_{sufixo}"] = val_limpo
+                elif "total shots" in stype:
+                    stats[f"chutes_totais_{sufixo}"] = val_limpo
                 elif "shots inside the box" in stype:
                     stats[f"chutes_dentro_area_{sufixo}"] = val_limpo
                 elif "dangerous attacks" in stype or "attacks" in stype:
@@ -140,10 +139,6 @@ def extrair_estatisticas(fixture_id):
                 elif "corner kicks" in stype:
                     stats[f"cantos_{sufixo}"] = val_limpo
                     stats["dados_validos"] = True
-                elif "expected goals" in stype:
-                    stats[f"xg_{sufixo}"] = f"{val_float:.2f}"
-                elif "goals prevented" in stype or "expected goals on target" in stype:
-                    stats[f"xgot_{sufixo}"] = f"{val_float:.2f}"
                     
     except Exception as e:
         print(f"[EXCEÇÃO ESTATÍSTICAS] Erro ao processar estatísticas do jogo {fixture_id}: {e}")
@@ -154,18 +149,16 @@ def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
     """Gera um mini histograma visual moderno com blocos baseado na evolução da pressão"""
     global HISTORICO_MOMENTUM
     if fixture_id not in HISTORICO_MOMENTUM:
-        HISTORICO_MOMENTUM[fixture_id] = [3, 5, 4, 7] # Histórico inicial padrão
+        HISTORICO_MOMENTUM[fixture_id] = [3, 5, 4, 7]
     
-    # Adiciona o novo nível medido (escala de 1 a 10)
     historico = HISTORICO_MOMENTUM[fixture_id]
     historico.append(intensidade_atual_valor)
     if len(historico) > 6:
-        historico.pop(0) # Mantém os últimos 6 registros
+        historico.pop(0)
         
     blocos = [' ', '▂', '▃', '▄', '▅', '▆', '▇', '█']
     grafico_str = ""
     for val in historico:
-        # Mapeia 1-10 para o índice dos blocos (0 a 7)
         indice = min(int((val / 10) * len(blocos)), len(blocos) - 1)
         grafico_str += blocos[indice] + " "
         
@@ -173,13 +166,14 @@ def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
 
 def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, minuto, estats, tipo="gols"):
     if not client_ai:
-        return 8, "• Pressão constante exercida no terço final\n• Alto volume ofensivo e finalizações de dentro da área"
+        return 8, "• Pressão constante exercida no terço final\n• Alto volume ofensivo e finalizações frequentes"
     
     resumo_stats = (
         f"Estatísticas - Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
         f"Chutes Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']} | "
+        f"Chutes Fora: {estats['chutes_fora_casa']} x {estats['chutes_fora_fora']} | "
+        f"Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']} | "
         f"Dentro da Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']} | "
-        f"xG: {estats['xg_casa']} x {estats['xg_fora']} | xGOT: {estats['xgot_casa']} x {estats['xgot_fora']} | "
         f"Ataques Perigosos: {estats['ataques_perigosos_casa']} x {estats['ataques_perigosos_fora']} | "
         f"Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}"
     )
@@ -187,10 +181,10 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
     prompt = (
         f"Atue como um analista estatístico profissional de apostas Live de elite. "
         f"Analise o jogo: {liga} | {time_casa} {gols_casa} x {gols_fora} {time_fora} aos {minuto}' do 2T.\n"
-        f"Dados avançados:\n{resumo_stats}\n\n"
+        f"Dados de campo:\n{resumo_stats}\n\n"
         f"Forneça estritamente:\n"
         f"1. Uma nota numérica inteira de 1 a 10 para o nível de pressão atual na primeira linha (apenas o número, ex: '9').\n"
-        f"2. Um texto curto em 2 linhas começando com '•' explicando a tendência baseada estritamente no xG e finalizações na área."
+        f"2. Um texto curto em 2 linhas começando com '•' explicando a tendência baseada no volume de finalizações e pressão."
     )
     
     try:
@@ -201,7 +195,6 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         texto_resposta = response.text.strip()
         linhas = texto_resposta.split('\n')
         
-        # Extrai o valor numérico da primeira linha para o gráfico
         nota_num = 8
         for char in linhas[0]:
             if char.isdigit():
@@ -211,7 +204,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         
         analise_linhas = "\n".join([l for l in linhas[1:] if l.strip()])
         if not analise_linhas:
-            analise_linhas = "• Alta qualidade nas finalizações e xG crescente\n• Pressão contínua no setor ofensivo"
+            analise_linhas = "• Alta movimentação e volume no setor ofensivo\n• Pressão contínua em busca do gol"
         return nota_num, analise_linhas
     except Exception as e:
         print(f"[EXCEÇÃO IA] Erro ao gerar análise: {e}")
@@ -219,7 +212,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
 
 def processar_partidas():
     hora_atual = datetime.now().strftime('%H:%M:%S')
-    print(f"\n[{hora_atual}] Iniciando varredura com motor xG/xGOT e Momentum Visual...")
+    print(f"\n[{hora_atual}] Iniciando varredura com estatísticas clássicas e Momentum Visual...")
     jogos = buscar_jogos_ao_vivo()
     
     if not jogos:
@@ -335,19 +328,18 @@ def processar_partidas():
                 f"🏆 Liga: {liga}\n"
                 f"⚽ Partida: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
                 f"⏱️ Alerta aos {minuto}' • Placar {gols_casa}-{gols_fora}\n\n"
-                f"📊 **Métricas Avançadas:**\n"
-                f"• Gols Esperados (xG): {estats['xg_casa']} x {estats['xg_fora']}\n"
-                f"• xGOT (Qualidade no Alvo): {estats['xgot_casa']} x {estats['xgot_fora']}\n"
-                f"• Chutes na Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']}\n"
+                f"📊 **Estatísticas Reais ao Vivo:**\n"
+                f"• Posse: {estats['posse_casa']} x {estats['posse_fora']}\n"
                 f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
-                f"• Ataques Perigosos: {estats['ataques_perigosos_casa']} x {estats['ataques_perigosos_fora']}\n"
+                f"• Chutes para Fora: {estats['chutes_fora_casa']} x {estats['chutes_fora_fora']}\n"
+                f"• Chutes Dentro da Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']}\n"
                 f"• Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}\n\n"
                 f"📈 **Gráfico de Momentum:**\n"
                 f"{grafico_visual}\n\n"
                 f"🎯 Mercado Sugerido: Mais de {total_gols_atual + 0.5} Gols (Live)\n"
                 f"💡 **Análise Quantitativa:**\n"
                 f"{analise_ia}\n\n"
-                f"⚠️ Alerta estatístico baseado em dados avançados — gerencie sua banca."
+                f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
             )
             
             msg_id = enviar_alerta_telegram(mensagem)
@@ -384,14 +376,14 @@ def processar_partidas():
                 f"⏱️ Alerta aos {minuto}' • Total de Cantos: {total_cantos_atual}\n\n"
                 f"📊 **Estatísticas de Pressão Lateral:**\n"
                 f"• Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}\n"
-                f"• Ataques Perigosos: {estats['ataques_perigosos_casa']} x {estats['ataques_perigosos_fora']}\n"
+                f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
                 f"• Posse de Bola: {estats['posse_casa']} x {estats['posse_fora']}\n\n"
                 f"📈 **Gráfico de Momentum:**\n"
                 f"{grafico_visual}\n\n"
                 f"🎯 Mercado Sugerido: Mais de {total_cantos_atual + 1.5} Escanteios (Live)\n"
                 f"💡 **Análise Quantitativa:**\n"
                 f"{analise_cantos_ia}\n\n"
-                f"⚠️ Alerta estatístico baseado em dados avançados — gerencie sua banca."
+                f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
             )
             
             msg_id = enviar_alerta_telegram(mensagem_cantos)
@@ -411,8 +403,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô com xG/xGOT e Gráfico de Momentum Visual iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com métricas avançadas de xG/xGOT e Gráfico de Pressão Visual por Blocos!*")
+    print("🤖 Robô com estatísticas clássicas e Gráfico de Momentum Visual iniciado!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com parâmetros estatísticos clássicos e Gráfico de Pressão Visual!*")
     
     while True:
         try:
