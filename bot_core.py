@@ -145,7 +145,7 @@ def enviar_relatorio_diario():
     print("📢 Relatório diário enviado com sucesso!")
 
 def main():
-    print("🤖 Robô Elite (Com Trava Anti-VAR e Relatório Diário) iniciado!")
+    print("🤖 Robô Elite (Com Correção de Sincronia de Gols) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
@@ -158,7 +158,6 @@ def main():
         reiniciar_estatisticas_se_novo_dia()
         
         agora = datetime.now()
-        # Gatilho para disparar o relatório diário à meia-noite (00:00 a 00:05)
         if agora.hour == 0 and agora.minute < 5 and ultimo_dia_relatorio != agora.date():
             enviar_relatorio_diario()
             ultimo_dia_relatorio = agora.date()
@@ -190,17 +189,15 @@ def main():
                     f"🟢 *GOL CONFIRMADO depois do alerta!*\n"
                     f"⚽ {pendente['home']} {g_home_atual} x {g_away_atual} {pendente['away']} • Placar Atual\n"
                     f"⏱️ Alerta enviado aos {pendente['minuto_alerta']}'\n"
-                    f"⚽ Gol saiu aos {elapsed_atual}'\n"
+                    f"⚽ Gol saiu logo após o alerta\n"
                     f"⏳ Você teve {tempo_para_agir} minutos para agir!"
                 )
                 enviar_telegram(feedback_msg, reply_to_message_id=pendente['message_id'])
                 
-                # Computa Green de Gols
                 estatisticas_diarias["gols_green"] += 1
                 del gols_pendentes_var[fixture_id]
             else:
                 print(f"⚠️ Gol anulado pelo VAR detectado na partida {pendente['home']} x {pendente['away']}. Alerta cancelado.")
-                # Computa Red/Anulado de Gols
                 estatisticas_diarias["gols_red_ou_anulado"] += 1
                 del gols_pendentes_var[fixture_id]
 
@@ -245,8 +242,6 @@ def main():
                             f"🎯 Meta batida com sucesso!"
                         )
                         enviar_telegram(feedback_cantos, reply_to_message_id=info['message_id'])
-                        
-                        # Computa Green de Escanteios
                         estatisticas_diarias["cantos_green"] += 1
                         del sinais_ativos[fixture_id]
                     elif elapsed_atual >= 90 and cantos_totais_atual < info['meta_cantos']:
@@ -256,8 +251,6 @@ def main():
                             f"⏱️ Alerta aos {info['minuto_alerta']}' | Fechou com {cantos_totais_atual} cantos (Meta: {info['meta_cantos']})"
                         )
                         enviar_telegram(feedback_red, reply_to_message_id=info['message_id'])
-                        
-                        # Computa Red de Escanteios
                         estatisticas_diarias["cantos_red"] += 1
                         del sinais_ativos[fixture_id]
 
@@ -308,12 +301,22 @@ def main():
                         total_chutes = total_shots_home + total_shots_away
                         total_escanteios = corners_home + corners_away
 
-                        # A. Alerta de Gols
+                        # A. Alerta de Gols (Com Trava de Sincronia / Evita Disparo Pós-Gol)
                         if not jogo_goleada and chave_gol not in jogos_notificados_gols:
                             e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
                             e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
 
                             if e_primeiro_tempo or e_segundo_tempo:
+                                # CORREÇÃO: Valida se a API já registrou gol na mesma rodada de varredura para não atrasar
+                                match_recheck = [m for m in buscar_jogos_ao_vivo() if m['fixture']['id'] == fixture_id]
+                                if match_recheck:
+                                    g_h_check = match_recheck[0]['goals']['home'] or 0
+                                    g_a_check = match_recheck[0]['goals']['away'] or 0
+                                    if (g_h_check + g_a_check) > gols_totais:
+                                        # O placar mudou exatamente agora, aborta o alerta para não pegar o gol atrasado
+                                        jogos_notificados_gols.add(chave_gol)
+                                        continue
+
                                 xg_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08) + (corners_home * 0.03), 2)
                                 xg_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08) + (corners_away * 0.03), 2)
 
