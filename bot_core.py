@@ -33,7 +33,7 @@ LIGAS_PERMITIDAS = {
     242,       # Equador: Liga Pro
 
     # ----------------------------------------------------
-    # NOVAS LIGAS PARA A FAIXA DA MANHÃ (Adicionadas)
+    # NOVAS LIGAS PARA A FAIXA DA MANHÃ
     # ----------------------------------------------------
     98,        # J1 League (Japão) - Madrugada/Manhã
     292,       # K League 1 (Coreia do Sul) - Madrugada/Manhã
@@ -156,13 +156,12 @@ def enviar_relatorio_diario():
         f"• Total de Entradas: {total_sinais}\n"
         f"• Acertos: {total_acertos} | Erros: {total_erros}\n"
         f"🎯 *Assertividade (Win Rate): {win_rate:.1f}%*\n\n"
-        f"💪 Seguimos firmes e com gestão de banca profissional para amanhã!"
+        f"💪 Seguimos firmes e com gestão de banca profissional!"
     )
     enviar_telegram(relatorio)
     print("📢 Relatório diário enviado com sucesso!")
 
 def extrair_minuto_ultimo_gol(match, fallback_minute):
-    """Busca o minuto exato do gol nos logs oficiais do evento da API."""
     eventos = match.get('events', [])
     if not eventos: 
         return fallback_minute
@@ -173,7 +172,7 @@ def extrair_minuto_ultimo_gol(match, fallback_minute):
     return fallback_minute
 
 def main():
-    print("🤖 Robô Elite (Ligas da Manhã + Horário Oficial + Filtro VAR) iniciado!")
+    print("🤖 Robô Elite (Ligas da Manhã + Trava 4 min + Filtro VAR) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
@@ -314,7 +313,8 @@ def main():
                     chave_gol = f"{fixture_id}-{elapsed // 20}"
                     chave_canto = f"canto-{fixture_id}"
 
-                    teve_gol_recente = (elapsed - info_gol_partida["minuto_gol"]) <= 10
+                    # TRAVA AJUSTADA PARA 4 MINUTOS
+                    teve_gol_recente = (elapsed - info_gol_partida["minuto_gol"]) <= 4
 
                     estatisticas = buscar_estatisticas_partida(fixture_id)
                     
