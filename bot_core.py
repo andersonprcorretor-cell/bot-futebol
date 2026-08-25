@@ -97,7 +97,7 @@ def buscar_estatisticas_partida(fixture_id):
     return []
 
 def extrair_estatisticas(fixture_id):
-    """Extração robusta e blindada mapeando diretamente os nomes oficiais da API-Football"""
+    """Extração robusta e blindada mapeando os nomes oficiais da API-Football (incluindo variações de ataques perigosos)"""
     stats = {
         "posse_casa": "50%", "posse_fora": "50%",
         "chutes_alvo_casa": 0, "chutes_alvo_fora": 0,
@@ -117,7 +117,7 @@ def extrair_estatisticas(fixture_id):
             estatisticas_time = time_data.get('statistics', [])
             
             for s in estatisticas_time:
-                stype = str(s.get('type', '')).strip()
+                stype = str(s.get('type', '')).strip().lower()
                 sval = s.get('value')
                 
                 if sval is None:
@@ -132,18 +132,18 @@ def extrair_estatisticas(fixture_id):
                 except:
                     val_limpo = 0
 
-                if stype == "Ball Possession":
+                if "ball possession" in stype:
                     stats[f"posse_{sufixo}"] = str(sval) if '%' in str(sval) else f"{sval}%"
                     stats["dados_validos"] = True
-                elif stype == "Shots on Goal":
+                elif "shots on goal" in stype:
                     stats[f"chutes_alvo_{sufixo}"] = val_limpo
                     stats["dados_validos"] = True
-                elif stype == "Shots off Goal":
+                elif "shots off goal" in stype:
                     stats[f"chutes_fora_{sufixo}"] = val_limpo
-                elif stype == "Dangerous Attacks":
+                elif "dangerous attacks" in stype or "attacks" in stype:
                     stats[f"ataques_perigosos_{sufixo}"] = val_limpo
                     stats["dados_validos"] = True
-                elif stype == "Corner Kicks":
+                elif "corner kicks" in stype:
                     stats[f"cantos_{sufixo}"] = val_limpo
                     stats["dados_validos"] = True
                     
@@ -231,9 +231,7 @@ def processar_partidas():
 
             if dados_fb['tipo'] == 'gols':
                 if total_gols_agora > dados_fb['gols_no_alerta']:
-                    # Cálculo do tempo que o usuário teve para agir
                     minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
-                    
                     msg_feedback = (
                         f"✅ **GREEN / GOL CONFIRMADO!** ✅\n\n"
                         f"⚽ Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n"
@@ -249,18 +247,22 @@ def processar_partidas():
             elif dados_fb['tipo'] == 'escanteios':
                 meta_cantos = dados_fb['meta_cantos']
                 if total_cantos_agora >= meta_cantos:
+                    minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
                     msg_feedback = (
                         f"✅ **ESCANTEIOS BATERAM!** 🎯\n\n"
                         f"🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n"
-                        f"⏱️ Alerta aos {minuto_agora}' | Fechou com {total_cantos_agora} escanteios (Meta: Mais de {meta_cantos - 0.5})"
+                        f"⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_agora} escanteios (Meta: Mais de {meta_cantos - 0.5})\n"
+                        f"⏳ Tempo para agir: {minutos_para_agir} minuto(s) de janela"
                     )
                     enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
                     jogos_para_remover.append(fixture_id)
                 elif minuto_agora >= 88 or (minuto_agora - dados_fb['minuto_alerta']) > 20:
+                    minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
                     msg_feedback = (
                         f"🔴 **ESCANTEIOS NÃO BATERAM**\n\n"
                         f"🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n"
-                        f"⏱️ Alerta aos {minuto_agora}' | Fechou com {total_cantos_agora} escanteios (Meta: Mais de {meta_cantos - 0.5})"
+                        f"⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_agora} escanteios (Meta: Mais de {meta_cantos - 0.5})\n"
+                        f"⏳ Duração do acompanhamento: {minutos_para_agir} minuto(s)"
                     )
                     enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
                     jogos_para_remover.append(fixture_id)
@@ -313,7 +315,6 @@ def processar_partidas():
         if status_short in ['2H'] and 60 <= minuto <= 80:
             estats = extrair_estatisticas(fixture_id)
             
-            # Só dispara se houver dados estatísticos válidos e preenchidos
             if not estats['dados_validos']:
                 continue
 
@@ -361,7 +362,6 @@ def processar_partidas():
         if status_short in ['2H'] and 70 <= minuto <= 80:
             estats = extrair_estatisticas(fixture_id)
             
-            # Só dispara se houver dados estatísticos válidos e preenchidos
             if not estats['dados_validos']:
                 continue
 
@@ -407,7 +407,7 @@ def processar_partidas():
 
 if __name__ == "__main__":
     print("🤖 Robô de Alertas Preditivos (Focado em Ligas Principais e Gemini 3.6) iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com modelo Gemini 3.6 e filtro de ligas principais!*")
+    enviar_alerta_telegram("🚀 *Robô atualizado com modelo Gemini 3.6, correção de ataques perigosos e monitoramento completo de escanteios!*")
     
     while True:
         try:
