@@ -231,10 +231,14 @@ def processar_partidas():
 
             if dados_fb['tipo'] == 'gols':
                 if total_gols_agora > dados_fb['gols_no_alerta']:
+                    # Cálculo do tempo que o usuário teve para agir
+                    minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
+                    
                     msg_feedback = (
                         f"✅ **GREEN / GOL CONFIRMADO!** ✅\n\n"
                         f"⚽ Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n"
                         f"⏱️ O gol saiu aos {minuto_agora}' (Alerta enviado aos {dados_fb['minuto_alerta']}')\n"
+                        f"⏳ Tempo para agir: {minutos_para_agir} minuto(s) de janela\n"
                         f"🎯 Previsão do motor estatístico validada com sucesso!"
                     )
                     enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
@@ -371,7 +375,7 @@ def processar_partidas():
                 f"🚩 **TENDÊNCIA PARA ESCANTEIOS** 🚩\n\n"
                 f"🏆 Liga: {liga}\n"
                 f"⚽ Partida: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-                f"⏱️ Alerta enviado aos {minuto}' • Total de Cantos: {total_cantos_atual}\n\n"
+                f"⏱️ Alerta aos {minuto}' • Total de Cantos: {total_cantos_atual}\n\n"
                 f"📊 **Estatísticas Reais ao Vivo:**\n"
                 f"• Posse: {estats['posse_casa']} x {estats['posse_fora']}\n"
                 f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
