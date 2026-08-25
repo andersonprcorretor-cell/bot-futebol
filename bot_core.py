@@ -9,7 +9,9 @@ API_KEY = os.getenv("API_KEY")
 
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
+# Ligas principais globais + Ligas Noturnas das Américas adicionadas
 LIGAS_PERMITIDAS = {
+    # Principais Globais / Europa / Brasil
     71, 72,    # Brasileirão Série A e B
     39, 40,    # Premier League e Championship (Inglaterra)
     140, 141,  # La Liga e La Liga 2 (Espanha)
@@ -20,10 +22,16 @@ LIGAS_PERMITIDAS = {
     2,         # UEFA Champions League
     3,         # UEFA Europa League
     13,        # Copa Libertadores
-    11         # Copa Sul-Americana
+    11,        # Copa Sul-Americana
+    
+    # Ligas Noturnas das Américas (Argentina, Chile, Colômbia, Equador)
+    128,       # Argentina: Liga Profesional
+    265,       # Chile: Primera División
+    266,       # Chile: Primera B (Ascenso)
+    240,       # Colômbia: Primera B
+    242        # Equador: Liga Pro
 }
 
-# Estatísticas diárias para o Relatório
 estatisticas_diarias = {
     "data_atual": datetime.now().date(),
     "gols_enviados": 0,
@@ -145,7 +153,7 @@ def enviar_relatorio_diario():
     print("📢 Relatório diário enviado com sucesso!")
 
 def main():
-    print("🤖 Robô Elite (Com Correções de Gols e Escanteios Asiáticos) iniciado!")
+    print("🤖 Robô Elite (Ligas das Américas + Correções de Gols e Escanteios Asiáticos) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
@@ -161,7 +169,7 @@ def main():
             enviar_relatorio_diario()
             ultimo_dia_relatorio = agora.date()
 
-        print(f"[{agora.strftime('%H:%M:%S')}] Varrendo partidas e checando feedbacks...")
+        print(f"[{agora.strftime('%H:%M:%S')}] Varrendo partidas noturnas e checando feedbacks...")
         partidas = buscar_jogos_ao_vivo()
         partidas_dict = {match['fixture']['id']: match for match in partidas}
 
@@ -179,7 +187,7 @@ def main():
             gols_totais_atual = g_home + g_away
             elapsed_atual = match_atual['fixture']['status']['elapsed'] or 0
 
-            # Tratamento para Gols (Dispara imediatamente e continua apto a novos gols)
+            # Tratamento para Gols (Múltiplos Greens sequenciais)
             if info['tipo'] == 'gols' and gols_totais_atual > info['gols_no_alerta']:
                 tempo_para_agir = elapsed_atual - info['minuto_alerta']
                 if tempo_para_agir < 0: 
@@ -193,16 +201,13 @@ def main():
                     f"⏳ Você teve {tempo_para_agir} minutos para agir!"
                 )
                 enviar_telegram(feedback_msg, reply_to_message_id=info['message_id'])
-                
                 estatisticas_diarias["gols_green"] += 1
-                
-                # Atualiza a contagem para monitorar se sair MAIS gols na mesma partida
                 info['gols_no_alerta'] = gols_totais_atual
                 
                 if elapsed_atual >= 90:
                     del sinais_ativos[fixture_id]
 
-            # Tratamento para Escanteios (Garantindo comparação correta com linha decimal .5)
+            # Tratamento Rigoroso para Escanteios (Soma real + Comparação decimal estrita)
             elif info['tipo'] == 'cantos':
                 estatisticas_fb = buscar_estatisticas_partida(fixture_id)
                 if len(estatisticas_fb) == 2:
@@ -210,8 +215,8 @@ def main():
                     c_away = extrair_estatistica(estatisticas_fb[1]['statistics'], "Corner Kicks")
                     cantos_totais_atual = c_home + c_away
 
-                    # Compara estritamente se atingiu a linha decimal (ex: >= 13.5)
-                    if cantos_totais_atual >= info['meta_cantos'] or (elapsed_atual >= 90 and cantos_totais_atual >= info['meta_cantos']):
+                    # Validação exata: 13 cantos com meta 13.5 cairá no RED (13 >= 13.5 é falso)
+                    if cantos_totais_atual >= info['meta_cantos']:
                         feedback_cantos = (
                             f"🟢 *ESCANTEIOS CONFIRMADOS!*\n"
                             f"🚩 {info['home']} vs {info['away']}\n"
@@ -279,7 +284,7 @@ def main():
                         total_chutes = total_shots_home + total_shots_away
                         total_escanteios = corners_home + corners_away
 
-                        # A. Alerta de Gols (Com Trava de Sincronia / Evita Disparo Pós-Gol)
+                        # A. Alerta de Gols
                         if not jogo_goleada and chave_gol not in jogos_notificados_gols:
                             e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
                             e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
@@ -337,7 +342,7 @@ def main():
                                 jogos_notificados_gols.add(chave_gol)
                                 time.sleep(2)
 
-                        # B. Alerta de Escanteios (Garantindo meta com final .5 exato)
+                        # B. Alerta de Escanteios (Soma real e meta decimal segura)
                         if chave_canto not in jogos_notificados_cantos:
                             if 65 <= elapsed <= 85 and total_escanteios >= 8:
                                 meta_cantos_decimal = total_escanteios + 2.5
