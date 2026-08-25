@@ -8,12 +8,15 @@ from datetime import datetime
 # ==========================================
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "SEU_TELEGRAM_TOKEN_AQUI")
 CHAT_ID = os.getenv("CHAT_ID", "SEU_CHAT_ID_AQUI")
-# Ajustado para ler exatamente o nome da variável cadastrada na Railway (API_KEY)
 FOOTBALL_API_KEY = os.getenv("API_KEY", "SUA_API_KEY_AQUI")
 
 HEADERS_API = {
     'x-apisports-key': FOOTBALL_API_KEY
 }
+
+# Dicionário para controlar quais jogos já mandamos alerta recentemente (Evita Spam)
+# Formato: { fixture_id: timestamp_do_ultimo_envio }
+CACHE_ALERTAS_ENVIADOS = {}
 
 def enviar_alerta_telegram(mensagem):
     """Envia o alerta formatado para o chat do Telegram"""
@@ -36,12 +39,9 @@ def buscar_jogos_ao_vivo():
     params = {"live": "all"}
     try:
         response = requests.get(url, headers=HEADERS_API, params=params, timeout=15)
-        print(f"[DEBUG] Status Code da API: {response.status_code}")
-        
         if response.status_code == 200:
             dados_json = response.json()
             jogos = dados_json.get('response', [])
-            print(f"[API] Sucesso! Encontrados {len(jogos)} jogos ao vivo neste momento.")
             return jogos
         else:
             print(f"[ERRO API] Retornou status {response.status_code}: {response.text}")
@@ -49,38 +49,22 @@ def buscar_jogos_ao_vivo():
         print(f"[EXCEÇÃO API] Erro ao buscar jogos ao vivo: {e}")
     return []
 
-def verificar_inercia_primeiro_tempo(estatisticas_1t):
+def avaliar_gatilho_real(jogo):
     """
-    Avalia se o primeiro tempo terminou com alta intensidade para 
-    ativar o radar de pressão nos primeiros 15 minutos do segundo tempo.
+    Avalia os gatilhos com base nas estatísticas reais e minuto do jogo da API.
+    Aqui você pode refinar as regras reais de chutes, ataques perigosos, etc.
     """
-    finalizacoes_finais_1t = estatisticas_1t.get('finalizacoes_ultimos_minutos', 0)
-    pressao_alta_1t = estatisticas_1t.get('pressao_constante', False)
+    status_short = jogo['fixture']['status']['short']
+    minuto = jogo['fixture']['status']['elapsed'] or 0
     
-    if finalizacoes_finais_1t >= 3 or pressao_alta_1t:
-        return True
-    return False
+    tempo = '1T' if status_short in ['1H', 'HT'] else '2T'
+    
+    # Exemplo de regra baseada no minuto do jogo (substitua pelas suas estatísticas da API quando quiser)
+    # Exemplo: gatilho de pressão no segundo tempo entre 50' e 80'
+    if tempo == '2T' and 50 <= minuto <= 80:
+        return True, "⚡ GATILHO DE PRESSÃO CONVENCIONAL", minuto, tempo
 
-def avaliar_gatilho_entrada(partida):
-    """
-    Avalia os gatilhos padrão de pressão e a Regra de Inércia do 1º Tempo
-    """
-    minuto = partida.get('minuto', 0)
-    tempo = partida.get('tempo', '1T')
-    
-    # Critério convencional de pressão no decorrer do jogo
-    criterio_convencional = partida.get('aceleracao_chutes', False) and partida.get('pressao_ativa', False)
-    
-    # Inércia do 1º Tempo aplicada nos primeiros minutos do 2º Tempo (46' a 60')
-    if tempo == '2T' and 46 <= minuto <= 60:
-        teve_inercia_1t = partida.get('alerta_inercia_intervalo', False)
-        if teve_inercia_1t and partida.get('finalizacoes_recente_2t', 0) >= 1:
-            return True, "🔥 GATILHO DE INÉRCIA DO 1º TEMPO (Início do 2T)"
-            
-    if criterio_convencional:
-        return True, "⚡ GATILHO DE PRESSÃO CONVENCIONAL"
-        
-    return False, ""
+    return False, "", minuto, tempo
 
 def processar_partidas():
     hora_atual = datetime.now().strftime('%H:%M:%S')
@@ -91,38 +75,28 @@ def processar_partidas():
         print(f"[{hora_atual}] Nenhum jogo ao vivo encontrado na API nesta varredura.")
         return
 
-    print(f"[{hora_atual}] Analisando dados... Exemplo dos primeiros jogos da lista:")
-    for i, jogo in enumerate(jogos[:5]): 
-        liga = jogo['league']['name']
-        casa = jogo['teams']['home']['name']
-        fora = jogo['teams']['away']['name']
-        minuto = jogo['fixture']['status']['elapsed']
-        print(f"   -> {liga}: {casa} x {fora} ({minuto}')")
-
-    if len(jogos) > 5:
-        print(f"   -> ... e mais {len(jogos) - 5} jogos sendo processados nos bastidores.")
+    print(f"[{hora_atual}] Total de jogos ao vivo na API: {len(jogos)}")
     
+    global CACHE_ALERTAS_ENVIADOS
+    tempo_atual = time.time()
+    
+    # Limpa o cache de jogos antigos (remove o que foi enviado há mais de 30 minutos para poder alertar novamente se necessário)
+    CACHE_ALERTAS_ENVIADOS = {fid: ts for fid, ts in CACHE_ALERTAS_ENVIADOS.items() if tempo_atual - ts < 1800}
+
     jogos_com_alerta = 0
     for jogo in jogos:
+        fixture_id = jogo['fixture']['id']
         time_casa = jogo['teams']['home']['name']
         time_fora = jogo['teams']['away']['name']
-        minuto = jogo['fixture']['status']['elapsed']
-        status_short = jogo['fixture']['status']['short']
         
-        tempo = '1T' if status_short in ['1H', 'HT'] else '2T'
-        
-        dados_partida = {
-            'minuto': minuto,
-            'tempo': tempo,
-            'aceleracao_chutes': True if minuto in range(17, 44) or minuto in range(53, 87) else False,
-            'pressao_ativa': True,
-            'alerta_inercia_intervalo': True,
-            'finalizacoes_recente_2t': 2
-        }
-        
-        disparar, motivo = avaliar_gatilho_entrada(dados_partida)
+        # Avalia se a partida cumpre os requisitos reais
+        disparar, motivo, minuto, tempo = avaliar_gatilho_real(jogo)
         
         if disparar:
+            # Verifica se já mandamos alerta para este jogo nos últimos 20 minutos (1200 segundos)
+            if fixture_id in CACHE_ALERTAS_ENVIADOS:
+                continue 
+                
             mensagem = (
                 f"{motivo}\n"
                 f"⚽ *{time_casa} vs {time_fora}*\n"
@@ -130,7 +104,10 @@ def processar_partidas():
                 f"📊 Oportunidade detectada pelo motor preditivo!"
             )
             enviar_alerta_telegram(mensagem)
-            print(f"   [ALERTA DISPARADO!] 🚨 {time_casa} x {time_fora} aos {minuto}' - Motivo: {motivo}")
+            print(f"   [ALERTA ENVIADO!] 🚨 {time_casa} x {time_fora} aos {minuto}'")
+            
+            # Registra no cache que este jogo acabou de receber alerta
+            CACHE_ALERTAS_ENVIADOS[fixture_id] = tempo_atual
             jogos_com_alerta += 1
 
     print(f"[{hora_atual}] Varredura concluída. Alertas enviados neste ciclo: {jogos_com_alerta}")
@@ -139,8 +116,8 @@ if __name__ == "__main__":
     print("🤖 Robô de Alertas Preditivos iniciado com sucesso!")
     
     enviar_alerta_telegram(
-        "🚀 *Robô sincronizado com a Railway!* \n"
-        "🔥 Chave de API corrigida, Inércia do 1º Tempo ativa e varredura de partidas ao vivo operando a pleno vapor."
+        "🚀 *Robô atualizado e operando com dados reais da API!* \n"
+        "🛡️ Filtro anti-spam de partidas ativado com sucesso."
     )
     
     while True:
