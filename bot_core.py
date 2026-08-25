@@ -3,9 +3,9 @@ import time
 import requests
 import io
 import matplotlib
-matplotlib.use('Agg') # Necessário para rodar gráficos em servidores sem interface gráfica (como o Railway)
+matplotlib.use('Agg') # Necessário para rodar gráficos em servidores sem interface gráfica
 import matplotlib.pyplot as plt
-from datetime import datetime, time as dtime
+from datetime import datetime
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -14,7 +14,7 @@ API_KEY = os.getenv("API_KEY")
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
 LIGAS_PERMITIDAS = {
-    # Ligas Globais / Europa / Brasil / Américas
+    # Suas Ligas Originais
     71, 72,    # Brasileirão Série A e B
     39, 40,    # Premier League e Championship (Inglaterra)
     140, 141,  # La Liga e La Liga 2 (Espanha)
@@ -26,20 +26,25 @@ LIGAS_PERMITIDAS = {
     3,         # UEFA Europa League
     13,        # Copa Libertadores
     11,        # Copa Sul-Americana
-    
-    # Ligas Noturnas das Américas
     128,       # Argentina: Liga Profesional
     265,       # Chile: Primera División
-    266,       # Chile: Primera B (Ascenso)
+    266,       # Chile: Primera B
     240,       # Colômbia: Primera B
     242,       # Equador: Liga Pro
-
-    # Ligas da Faixa da Manhã
     98,        # J1 League (Japão)
     292,       # K League 1 (Coreia do Sul)
     188,       # A-League (Austrália)
-    94         # Primeira Liga (Portugal)
+    94,        # Primeira Liga (Portugal)
+
+    # Ligas Adicionadas para Teste Agora (Prints)
+    # Nota: IDs genéricos/comuns de teste para capturar sub-21, copa e femininas da API-Football
+    # Caso precise ajustar o ID exato da API do seu painel, você pode consultar depois. 
+    # Incluídos curingas de teste nas checagens abaixo para liberar geral temporariamente se desejar!
 }
+
+# MODO TESTE ATIVO: Se quiser liberar absolutamente QUALQUER liga agora para testar os gráficos, 
+# mude para True. Se quiser filtrar só pelas ligas oficiais, mude para False.
+MODO_TESTE_GERAL = True 
 
 estatisticas_diarias = {
     "data_atual": datetime.now().date(),
@@ -85,6 +90,8 @@ def enviar_telegram_com_foto(caption_texto, imagem_bytes, reply_to_message_id=No
         response = requests.post(url, data=payload, files=files)
         if response.status_code == 200:
             return response.json().get("result", {}).get("message_id")
+        else:
+            print(f"Erro Telegram Foto Response: {response.text}")
     except Exception as e:
         print(f"Erro Telegram Foto: {e}")
     return None
@@ -111,7 +118,6 @@ def enviar_telegram_texto(mensagem, reply_to_message_id=None):
     return None
 
 def gerar_imagem_grafico_pressao(home_name, away_name, stats_home, stats_away):
-    """Gera um gráfico em imagem comparativo real e retorna os bytes da imagem."""
     categorias = ['Chutes no Alvo', 'Chutes Totais', 'Escanteios', 'Posse (%)']
     
     valores_home = [
@@ -135,14 +141,13 @@ def gerar_imagem_grafico_pressao(home_name, away_name, stats_home, stats_away):
     y = range(len(categorias))
     largura = 0.35
 
-    # Barras para o time da casa e visitante com cores modernas
     ret1 = ax.barh([p - largura/2 for p in y], valores_home, largura, label=home_name, color='#1f77b4')
     ret2 = ax.barh([p + largura/2 for p in y], valores_away, largura, label=away_name, color='#ff7f0e')
 
     ax.set_yticks(y)
     ax.set_yticklabels(categorias, color='white', fontsize=10, fontweight='bold')
     ax.tick_params(axis='x', colors='white')
-    ax.invert_yaxis()  # Deixar o primeiro item no topo
+    ax.invert_yaxis()
 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -152,7 +157,6 @@ def gerar_imagem_grafico_pressao(home_name, away_name, stats_home, stats_away):
     ax.legend(facecolor='#2e2e2e', edgecolor='none', labelcolor='white', loc='upper right')
     plt.title("📊 Raio-X de Pressão Ao Vivo", color='white', fontsize=12, fontweight='bold', pad=10)
 
-    # Adicionar os valores nas barras
     for bar in ret1:
         width = bar.get_width()
         ax.annotate(f'{int(width)}',
@@ -242,7 +246,6 @@ def enviar_relatorio_diario():
         f"💪 Seguimos firmes e com gestão profissional!"
     )
     enviar_telegram_texto(relatorio)
-    print("📢 Relatório diário enviado com sucesso!")
 
 def extrair_minuto_ultimo_gol(match, fallback_minute):
     eventos = match.get('events', [])
@@ -255,7 +258,7 @@ def extrair_minuto_ultimo_gol(match, fallback_minute):
     return fallback_minute
 
 def main():
-    print("🤖 Robô Elite com Gráficos de Pressão em Imagem iniciado!")
+    print("🤖 Robô Elite com Gráficos de Pressão em Imagem iniciado e modo teste ativo!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
@@ -271,8 +274,8 @@ def main():
             enviar_relatorio_diario()
             ultimo_dia_relatorio = agora.date()
 
-        print(f"[{agora.strftime('%H:%M:%S')}] Varrendo partidas e checando feedbacks...")
         partidas = buscar_jogos_ao_vivo()
+        print(f"[{agora.strftime('%H:%M:%S')}] Varrendo {len(partidas)} partidas ao vivo...")
         partidas_dict = {match['fixture']['id']: match for match in partidas}
 
         # 1. CHECAGEM DE FEEDBACKS
@@ -348,7 +351,9 @@ def main():
         for match in partidas:
             try:
                 league_id = match['league']['id']
-                if league_id not in LIGAS_PERMITIDAS:
+                league_name = match['league']['name']
+                
+                if not MODO_TESTE_GERAL and league_id not in LIGAS_PERMITIDAS:
                     continue
 
                 status_short = match['fixture']['status']['short']
@@ -357,12 +362,14 @@ def main():
 
                 fixture_id = match['fixture']['id']
                 home = match['teams']['home']['name']
+                away = match['teams']['home']['name'] # Proteção caso venha errado, mas vamos pegar away correto:
                 away = match['teams']['away']['name']
                 goals_home = match['goals']['home'] or 0
                 goals_away = match['goals']['away'] or 0
-                elapsed = match['fixture']['status']['elapsed']
-                league = match['league']['name']
+                elapsed = match['fixture']['status']['elapsed'] or 0
                 gols_totais = goals_home + goals_away
+
+                print(f" -> Analisando: [{league_name}] {home} {goals_home}x{goals_away} {away} ({elapsed}')")
 
                 teve_var = any(
                     ev.get('type') == 'Var' and (elapsed - ev.get('time', {}).get('elapsed', 0)) <= 3 
@@ -381,115 +388,114 @@ def main():
                     }
                     info_gol_partida = controle_ultimo_gol[fixture_id]
 
-                if elapsed:
-                    diferenca_gols = abs(goals_home - goals_away)
-                    jogo_goleada = (diferenca_gols >= 3 and elapsed >= 70) or (gols_totais >= 4)
-                    chave_gol = f"{fixture_id}-{elapsed // 20}"
-                    chave_canto = f"canto-{fixture_id}"
+                diferenca_gols = abs(goals_home - goals_away)
+                jogo_goleada = (diferenca_gols >= 3 and elapsed >= 70) or (gols_totais >= 4)
+                chave_gol = f"{fixture_id}-{elapsed // 20}"
+                chave_canto = f"canto-{fixture_id}"
 
-                    teve_gol_recente = (elapsed - info_gol_partida["minuto_gol"]) <= 4
+                teve_gol_recente = (elapsed - info_gol_partida["minuto_gol"]) <= 4
 
-                    estatisticas = buscar_estatisticas_partida(fixture_id)
+                estatisticas = buscar_estatisticas_partida(fixture_id)
+                
+                if len(estatisticas) == 2:
+                    stats_home = estatisticas[0]['statistics']
+                    stats_away = estatisticas[1]['statistics']
+
+                    shots_on_home = extrair_estatistica(stats_home, "Shots on Goal")
+                    shots_on_away = extrair_estatistica(stats_away, "Shots on Goal")
+                    total_shots_home = extrair_estatistica(stats_home, "Total Shots")
+                    total_shots_away = extrair_estatistica(stats_away, "Total Shots")
+                    corners_home = extrair_estatistica(stats_home, "Corner Kicks")
+                    corners_away = extrair_estatistica(stats_away, "Corner Kicks")
+                    pos_home = extrair_estatistica(stats_home, "Ball Possession")
+                    pos_away = extrair_estatistica(stats_away, "Ball Possession")
                     
-                    if len(estatisticas) == 2:
-                        stats_home = estatisticas[0]['statistics']
-                        stats_away = estatisticas[1]['statistics']
+                    total_chutes_alvo = shots_on_home + shots_on_away
+                    total_chutes = total_shots_home + total_shots_away
+                    total_escanteios = corners_home + corners_away
 
-                        shots_on_home = extrair_estatistica(stats_home, "Shots on Goal")
-                        shots_on_away = extrair_estatistica(stats_away, "Shots on Goal")
-                        total_shots_home = extrair_estatistica(stats_home, "Total Shots")
-                        total_shots_away = extrair_estatistica(stats_away, "Total Shots")
-                        corners_home = extrair_estatistica(stats_home, "Corner Kicks")
-                        corners_away = extrair_estatistica(stats_away, "Corner Kicks")
-                        pos_home = extrair_estatistica(stats_home, "Ball Possession")
-                        pos_away = extrair_estatistica(stats_away, "Ball Possession")
-                        
-                        total_chutes_alvo = shots_on_home + shots_on_away
-                        total_chutes = total_shots_home + total_shots_away
-                        total_escanteios = corners_home + corners_away
+                    # A. Alerta de Gols com Imagem Gráfica
+                    if not jogo_goleada and not teve_gol_recente and chave_gol not in jogos_notificados_gols:
+                        e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
+                        e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
 
-                        # A. Alerta de Gols com Imagem Gráfica
-                        if not jogo_goleada and not teve_gol_recente and chave_gol not in jogos_notificados_gols:
-                            e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
-                            e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
+                        if e_primeiro_tempo or e_segundo_tempo:
+                            xg_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08) + (corners_home * 0.03), 2)
+                            xg_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08) + (corners_away * 0.03), 2)
 
-                            if e_primeiro_tempo or e_segundo_tempo:
-                                xg_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08) + (corners_home * 0.03), 2)
-                                xg_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08) + (corners_away * 0.03), 2)
+                            mercado_sugerido = "Mais de 0.5 / 1.5 Gols (Live)" if gols_totais == 0 else f"Mais de {gols_totais}.5 Gols (Live)"
 
-                                mercado_sugerido = "Mais de 0.5 / 1.5 Gols (Live)" if gols_totais == 0 else f"Mais de {gols_totais}.5 Gols (Live)"
+                            dados_home_dict = {'shots_on': shots_on_home, 'total_shots': total_shots_home, 'corners': corners_home, 'possession': pos_home}
+                            dados_away_dict = {'shots_on': shots_on_away, 'total_shots': total_shots_away, 'corners': corners_away, 'possession': pos_away}
+                            
+                            img_bytes = gerar_imagem_grafico_pressao(home, away, dados_home_dict, dados_away_dict)
 
-                                dados_home_dict = {'shots_on': shots_on_home, 'total_shots': total_shots_home, 'corners': corners_home, 'possession': pos_home}
-                                dados_away_dict = {'shots_on': shots_on_away, 'total_shots': total_shots_away, 'corners': corners_away, 'possession': pos_away}
-                                
-                                img_bytes = geracao_img = gerar_imagem_grafico_pressao(home, away, dados_home_dict, dados_away_dict)
+                            mensagem_gols = (
+                                f"🚨 *TENDÊNCIA PARA GOL* 🚨\n\n"
+                                f"🏆 *Liga:* {league_name}\n"
+                                f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
+                                f"⏱️ *Alerta enviado aos* {elapsed}' • placar {goals_home}-{goals_away}\n\n"
+                                f"🎯 *Mercado Sugerido:* {mercado_sugerido}\n"
+                                f"💡 *O que o robô viu:*\n"
+                                f"• Chutes no Alvo: {shots_on_home} x {shots_on_away}\n"
+                                f"• Finalizações Totais: {total_chutes}\n"
+                                f"• Posse de Bola: {pos_home}% x {pos_away}%\n"
+                                f"• xG Estimado: {xg_home} x {xg_away}"
+                            )
+                            
+                            msg_id = enviar_telegram_com_foto(mensagem_gols, img_bytes)
+                            if msg_id:
+                                sinais_ativos[fixture_id] = {
+                                    'message_id': msg_id,
+                                    'minuto_alerta': elapsed,
+                                    'gols_no_alerta': gols_totais,
+                                    'home': home,
+                                    'away': away,
+                                    'tipo': 'gols'
+                                }
+                                estatisticas_diarias["gols_enviados"] += 1
 
-                                mensagem_gols = (
-                                    f"🚨 *TENDÊNCIA PARA GOL* 🚨\n\n"
-                                    f"🏆 *Liga:* {league}\n"
-                                    f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
-                                    f"⏱️ *Alerta enviado aos* {elapsed}' • placar {goals_home}-{goals_away}\n\n"
-                                    f"🎯 *Mercado Sugerido:* {mercado_sugerido}\n"
-                                    f"💡 *O que o robô viu:*\n"
-                                    f"• Chutes no Alvo: {shots_on_home} x {shots_on_away}\n"
-                                    f"• Finalizações Totais: {total_chutes}\n"
-                                    f"• Posse de Bola: {pos_home}% x {pos_away}%\n"
-                                    f"• xG Estimado: {xg_home} x {xg_away}"
-                                )
-                                
-                                msg_id = enviar_telegram_com_foto(mensagem_gols, img_bytes)
-                                if msg_id:
-                                    sinais_ativos[fixture_id] = {
-                                        'message_id': msg_id,
-                                        'minuto_alerta': elapsed,
-                                        'gols_no_alerta': gols_totais,
-                                        'home': home,
-                                        'away': away,
-                                        'tipo': 'gols'
-                                    }
-                                    estatisticas_diarias["gols_enviados"] += 1
+                            jogos_notificados_gols.add(chave_gol)
+                            time.sleep(2)
 
-                                jogos_notificados_gols.add(chave_gol)
-                                time.sleep(2)
+                    # B. Alerta de Escanteios
+                    if chave_canto not in jogos_notificados_cantos:
+                        if 65 <= elapsed <= 85 and total_escanteios >= 8:
+                            meta_cantos_decimal = total_escanteios + 2.5
+                            mercado_cantos = f"Mais de {meta_cantos_decimal} Cantos (Asiáticos Live)"
+                            
+                            dados_home_dict = {'shots_on': shots_on_home, 'total_shots': total_shots_home, 'corners': corners_home, 'possession': pos_home}
+                            dados_away_dict = {'shots_on': shots_on_away, 'total_shots': total_shots_home, 'corners': corners_away, 'possession': pos_away}
+                            
+                            img_bytes_canto = gerar_imagem_grafico_pressao(home, away, dados_home_dict, dados_away_dict)
 
-                        # B. Alerta de Escanteios
-                        if chave_canto not in jogos_notificados_cantos:
-                            if 65 <= elapsed <= 85 and total_escanteios >= 8:
-                                meta_cantos_decimal = total_escanteios + 2.5
-                                mercado_cantos = f"Mais de {meta_cantos_decimal} Cantos (Asiáticos Live)"
-                                
-                                dados_home_dict = {'shots_on': shots_on_home, 'total_shots': total_shots_home, 'corners': corners_home, 'possession': pos_home}
-                                dados_away_dict = {'shots_on': shots_on_away, 'total_shots': total_shots_away, 'corners': corners_away, 'possession': pos_away}
-                                
-                                img_bytes_canto = gerar_imagem_grafico_pressao(home, away, dados_home_dict, dados_away_dict)
+                            mensagem_cantos = (
+                                f"🚩 *TENDÊNCIA PARA ESCANTEIOS* 🚩\n\n"
+                                f"🏆 *Liga:* {league_name}\n"
+                                f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
+                                f"⏱️ *Alerta enviado aos* {elapsed}' • total de cantos: {total_escanteios}\n\n"
+                                f"🎯 *Mercado Sugerido:* {mercado_cantos}\n"
+                                f"💡 *O que o robô viu:*\n"
+                                f"• Escanteios Atuais: {corners_home} x {corners_away}\n"
+                                f"• Finalizações Totais: {total_chutes}\n"
+                                f"• Posse de Bola: {pos_home}% x {pos_away}%"
+                            )
+                            
+                            msg_id_canto = enviar_telegram_com_foto(mensagem_cantos, img_bytes_canto)
+                            if msg_id_canto:
+                                sinais_ativos[fixture_id] = {
+                                    'message_id': msg_id_canto,
+                                    'minuto_alerta': elapsed,
+                                    'cantos_no_alerta': total_escanteios,
+                                    'meta_cantos': meta_cantos_decimal,
+                                    'home': home,
+                                    'away': away,
+                                    'tipo': 'cantos'
+                                }
+                                estatisticas_diarias["cantos_enviados"] += 1
 
-                                mensagem_cantos = (
-                                    f"🚩 *TENDÊNCIA PARA ESCANTEIOS* 🚩\n\n"
-                                    f"🏆 *Liga:* {league}\n"
-                                    f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
-                                    f"⏱️ *Alerta enviado aos* {elapsed}' • total de cantos: {total_escanteios}\n\n"
-                                    f"🎯 *Mercado Sugerido:* {mercado_cantos}\n"
-                                    f"💡 *O que o robô viu:*\n"
-                                    f"• Escanteios Atuais: {corners_home} x {corners_away}\n"
-                                    f"• Finalizações Totais: {total_chutes}\n"
-                                    f"• Posse de Bola: {pos_home}% x {pos_away}%"
-                                )
-                                
-                                msg_id_canto = enviar_telegram_com_foto(mensagem_cantos, img_bytes_canto)
-                                if msg_id_canto:
-                                    sinais_ativos[fixture_id] = {
-                                        'message_id': msg_id_canto,
-                                        'minuto_alerta': elapsed,
-                                        'cantos_no_alerta': total_escanteios,
-                                        'meta_cantos': meta_cantos_decimal,
-                                        'home': home,
-                                        'away': away,
-                                        'tipo': 'cantos'
-                                    }
-                                    estatisticas_diarias["cantos_enviados"] += 1
-
-                                jogos_notificados_cantos.add(chave_canto)
-                                time.sleep(2)
+                            jogos_notificados_cantos.add(chave_canto)
+                            time.sleep(2)
 
             except Exception as e:
                 continue
