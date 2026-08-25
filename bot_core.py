@@ -63,13 +63,13 @@ def buscar_jogos_ao_vivo():
 def buscar_estatisticas_partida(fixture_id):
     """Busca estatísticas detalhadas diretamente na rota específica da API-Football"""
     url = "https://v3.football.api-sports.io/fixtures/statistics"
-    params = {"fixture": fixture_id}
+    # Garantindo que o ID vai como inteiro para evitar rejeição da API
+    params = {"fixture": int(fixture_id)}
     try:
         response = requests.get(url, headers=HEADERS_API, params=params, timeout=10)
         if response.status_code == 200:
             dados_json = response.json()
             resp = dados_json.get('response', [])
-            # LOG DE DIAGNÓSTICO: Mostra no console do Railway o que a API está retornando para este jogo
             print(f"[DEBUG STATS API] Jogo {fixture_id} retornou {len(resp)} blocos de estatísticas.")
             return resp
     except Exception as e:
@@ -100,6 +100,9 @@ def extrair_estatisticas(fixture_id):
                 stype = str(s.get('type', '')).strip()
                 sval = s.get('value')
                 
+                # DIAGNÓSTICO: Mostra cada scout exato recebido da API no log do Railway
+                print(f"[DEBUG SCOUT] Jogo {fixture_id} ({sufixo}) -> Tipo: '{stype}' | Valor: {sval}")
+                
                 if sval is None:
                     continue
                 
@@ -121,7 +124,6 @@ def extrair_estatisticas(fixture_id):
                 elif stype == "Shots off Goal":
                     stats[f"chutes_fora_{sufixo}"] = val_limpo
                 elif stype == "Total Shots":
-                    # Caso venha Total Shots em vez de off/on separados, usamos para compor
                     pass
                 elif stype == "Dangerous Attacks":
                     stats[f"ataques_perigosos_{sufixo}"] = val_limpo
@@ -167,7 +169,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
     
     try:
         response = client_ai.models.generate_content(
-            model='gemini-3.6-flash',
+            model='gemini-2.5-flash',
             contents=prompt
         )
         texto_resposta = response.text.strip()
@@ -328,7 +330,6 @@ def processar_partidas():
         if status_short in ['2H'] and 70 <= minuto <= 80:
             estats = extrair_estatisticas(fixture_id)
             total_cantos_atual = estats['cantos_casa'] + estats['cantos_fora']
-            meta_sugerida = total_cantos_atual + 2
 
             intensidade_cantos, analise_cantos_ia = gerar_analise_inteligente(
                 liga, time_casa, time_fora, gols_casa, gols_fora, minuto, estats, tipo="escanteios"
@@ -355,7 +356,6 @@ def processar_partidas():
             msg_id = enviar_alerta_telegram(mensagem_cantos)
             if msg_id:
                 print(f"   [ALERTA ESCANTEIOS ENVIADO] 🚩 {time_casa} x {time_fora} aos {minuto}'")
-                CACHE_CACHE_ALERTAS_ENVIADOS = tempo_atual  # Mantém compatibilidade
                 CACHE_ALERTAS_ENVIADOS[fixture_id] = tempo_atual
                 MONITORAMENTO_FEEDBACK[fixture_id] = {
                     'tipo': 'escanteios',
