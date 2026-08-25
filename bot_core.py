@@ -145,12 +145,11 @@ def enviar_relatorio_diario():
     print("📢 Relatório diário enviado com sucesso!")
 
 def main():
-    print("🤖 Robô Elite (Com Correção de Sincronia de Gols) iniciado!")
+    print("🤖 Robô Elite (Com Correções de Gols e Escanteios Asiáticos) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
     sinais_ativos = {} 
-    gols_pendentes_var = {} 
 
     ultimo_dia_relatorio = datetime.now().date()
 
@@ -162,47 +161,12 @@ def main():
             enviar_relatorio_diario()
             ultimo_dia_relatorio = agora.date()
 
-        print(f"[{agora.strftime('%H:%M:%S')}] Varrendo partidas e checando feedbacks/VAR...")
+        print(f"[{agora.strftime('%H:%M:%S')}] Varrendo partidas e checando feedbacks...")
         partidas = buscar_jogos_ao_vivo()
         partidas_dict = {match['fixture']['id']: match for match in partidas}
 
         # ==========================================
-        # 1. TRATAMENTO DA TRAVA ANTI-VAR PARA GOLS
-        # ==========================================
-        for fixture_id, pendente in list(gols_pendentes_var.items()):
-            match_atual = partidas_dict.get(fixture_id)
-            if not match_atual:
-                del gols_pendentes_var[fixture_id]
-                continue
-
-            g_home_atual = match_atual['goals']['home'] if match_atual['goals']['home'] is not None else 0
-            g_away_atual = match_atual['goals']['away'] if match_atual['goals']['away'] is not None else 0
-            gols_totais_atual = g_home_atual + g_away_atual
-            elapsed_atual = match_atual['fixture']['status']['elapsed'] or 0
-
-            if gols_totais_atual >= pendente['novo_total_gols']:
-                tempo_para_agir = elapsed_atual - pendente['minuto_alerta']
-                if tempo_para_agir < 0: 
-                    tempo_para_agir = 1
-
-                feedback_msg = (
-                    f"🟢 *GOL CONFIRMADO depois do alerta!*\n"
-                    f"⚽ {pendente['home']} {g_home_atual} x {g_away_atual} {pendente['away']} • Placar Atual\n"
-                    f"⏱️ Alerta enviado aos {pendente['minuto_alerta']}'\n"
-                    f"⚽ Gol saiu logo após o alerta\n"
-                    f"⏳ Você teve {tempo_para_agir} minutos para agir!"
-                )
-                enviar_telegram(feedback_msg, reply_to_message_id=pendente['message_id'])
-                
-                estatisticas_diarias["gols_green"] += 1
-                del gols_pendentes_var[fixture_id]
-            else:
-                print(f"⚠️ Gol anulado pelo VAR detectado na partida {pendente['home']} x {pendente['away']}. Alerta cancelado.")
-                estatisticas_diarias["gols_red_ou_anulado"] += 1
-                del gols_pendentes_var[fixture_id]
-
-        # ==========================================
-        # 2. CHECAGEM DE FEEDBACKS (Gols ativos e Escanteios)
+        # 1. CHECAGEM DE FEEDBACKS (Gols e Escanteios Ativos)
         # ==========================================
         for fixture_id, info in list(sinais_ativos.items()):
             match_atual = partidas_dict.get(fixture_id)
@@ -215,25 +179,39 @@ def main():
             gols_totais_atual = g_home + g_away
             elapsed_atual = match_atual['fixture']['status']['elapsed'] or 0
 
+            # Tratamento para Gols (Dispara imediatamente e continua apto a novos gols)
             if info['tipo'] == 'gols' and gols_totais_atual > info['gols_no_alerta']:
-                gols_pendentes_var[fixture_id] = {
-                    'message_id': info['message_id'],
-                    'minuto_alerta': info['minuto_alerta'],
-                    'novo_total_gols': gols_totais_atual,
-                    'home': info['home'],
-                    'away': info['away']
-                }
-                del sinais_ativos[fixture_id]
-                continue
+                tempo_para_agir = elapsed_atual - info['minuto_alerta']
+                if tempo_para_agir < 0: 
+                    tempo_para_agir = 1
 
-            if info['tipo'] == 'cantos':
+                feedback_msg = (
+                    f"🟢 *GOL CONFIRMADO depois do alerta!*\n"
+                    f"⚽ {info['home']} {g_home} x {g_away} {info['away']} • Placar Atual\n"
+                    f"⏱️ Alerta enviado aos {info['minuto_alerta']}'\n"
+                    f"⚽ Gol saiu aos {elapsed_atual}'\n"
+                    f"⏳ Você teve {tempo_para_agir} minutos para agir!"
+                )
+                enviar_telegram(feedback_msg, reply_to_message_id=info['message_id'])
+                
+                estatisticas_diarias["gols_green"] += 1
+                
+                # Atualiza a contagem para monitorar se sair MAIS gols na mesma partida
+                info['gols_no_alerta'] = gols_totais_atual
+                
+                if elapsed_atual >= 90:
+                    del sinais_ativos[fixture_id]
+
+            # Tratamento para Escanteios (Garantindo comparação correta com linha decimal .5)
+            elif info['tipo'] == 'cantos':
                 estatisticas_fb = buscar_estatisticas_partida(fixture_id)
                 if len(estatisticas_fb) == 2:
                     c_home = extrair_estatistica(estatisticas_fb[0]['statistics'], "Corner Kicks")
                     c_away = extrair_estatistica(estatisticas_fb[1]['statistics'], "Corner Kicks")
                     cantos_totais_atual = c_home + c_away
 
-                    if cantos_totais_atual > info['meta_cantos'] or (elapsed_atual >= 90 and cantos_totais_atual >= info['meta_cantos']):
+                    # Compara estritamente se atingiu a linha decimal (ex: >= 13.5)
+                    if cantos_totais_atual >= info['meta_cantos'] or (elapsed_atual >= 90 and cantos_totais_atual >= info['meta_cantos']):
                         feedback_cantos = (
                             f"🟢 *ESCANTEIOS CONFIRMADOS!*\n"
                             f"🚩 {info['home']} vs {info['away']}\n"
@@ -248,14 +226,14 @@ def main():
                         feedback_red = (
                             f"🔴 *ESCANTEIOS NÃO BATERAM*\n"
                             f"🚩 {info['home']} vs {info['away']}\n"
-                            f"⏱️ Alerta aos {info['minuto_alerta']}' | Fechou com {cantos_totais_atual} cantos (Meta: {info['meta_cantos']})"
+                            f"⏱️ Alerta aos {info['minuto_alerta']}' | Fechou com {cantos_totais_atual} escanteios (Meta: Mais de {info['meta_cantos']})"
                         )
                         enviar_telegram(feedback_red, reply_to_message_id=info['message_id'])
                         estatisticas_diarias["cantos_red"] += 1
                         del sinais_ativos[fixture_id]
 
         # ==========================================
-        # 3. VARREDURA DE NOVAS OPORTUNIDADES
+        # 2. VARREDURA DE NOVAS OPORTUNIDADES
         # ==========================================
         for match in partidas:
             try:
@@ -307,13 +285,11 @@ def main():
                             e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
 
                             if e_primeiro_tempo or e_segundo_tempo:
-                                # CORREÇÃO: Valida se a API já registrou gol na mesma rodada de varredura para não atrasar
                                 match_recheck = [m for m in buscar_jogos_ao_vivo() if m['fixture']['id'] == fixture_id]
                                 if match_recheck:
                                     g_h_check = match_recheck[0]['goals']['home'] or 0
                                     g_a_check = match_recheck[0]['goals']['away'] or 0
                                     if (g_h_check + g_a_check) > gols_totais:
-                                        # O placar mudou exatamente agora, aborta o alerta para não pegar o gol atrasado
                                         jogos_notificados_gols.add(chave_gol)
                                         continue
 
@@ -361,11 +337,11 @@ def main():
                                 jogos_notificados_gols.add(chave_gol)
                                 time.sleep(2)
 
-                        # B. Alerta de Escanteios
+                        # B. Alerta de Escanteios (Garantindo meta com final .5 exato)
                         if chave_canto not in jogos_notificados_cantos:
                             if 65 <= elapsed <= 85 and total_escanteios >= 8:
-                                meta_cantos_sugerida = total_escanteios + 2
-                                mercado_cantos = f"Mais de {total_escanteios + 2.5} Cantos (Asiáticos Live)"
+                                meta_cantos_decimal = total_escanteios + 2.5
+                                mercado_cantos = f"Mais de {meta_cantos_decimal} Cantos (Asiáticos Live)"
                                 barra_grafica_cantos = gerar_barra_pressao(total_escanteios)
                                 
                                 mensagem_cantos = (
@@ -389,7 +365,7 @@ def main():
                                         'message_id': msg_id_canto,
                                         'minuto_alerta': elapsed,
                                         'cantos_no_alerta': total_escanteios,
-                                        'meta_cantos': meta_cantos_sugerida,
+                                        'meta_cantos': meta_cantos_decimal,
                                         'home': home,
                                         'away': away,
                                         'tipo': 'cantos'
