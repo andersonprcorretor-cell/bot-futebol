@@ -74,7 +74,7 @@ def buscar_estatisticas_partida(fixture_id):
     return []
 
 def extrair_estatisticas(fixture_id):
-    """Extrai e formata estatísticas detalhadas com mapeamento flexível da API-Football"""
+    """Extrai e formata estatísticas detalhadas com mapeamento ultra-flexível da API-Football"""
     stats = {
         "posse_casa": "50%", "posse_fora": "50%",
         "chutes_alvo_casa": 0, "chutes_alvo_fora": 0,
@@ -88,42 +88,37 @@ def extrair_estatisticas(fixture_id):
         return stats
 
     try:
-        # Time da casa (índice 0)
-        for s in stats_lista[0].get('statistics', []):
-            stype = s.get('type', '')
-            sval = s.get('value')
-            if sval is None:
-                continue
+        # Percorre os dois times retornados pela API (Índice 0 = Casa, Índice 1 = Fora)
+        for idx, time_data in enumerate(stats_lista[:2]):
+            sufixo = "casa" if idx == 0 else "fora"
             
-            if 'Possession' in stype:
-                stats["posse_casa"] = str(sval)
-            elif 'Shots on' in stype or ('Goal' in stype and 'On' in stype):
-                stats["chutes_alvo_casa"] = int(sval)
-            elif 'Shots off' in stype or 'Off Target' in stype:
-                stats["chutes_fora_casa"] = int(sval)
-            elif 'Dangerous Attacks' in stype:
-                stats["ataques_perigosos_casa"] = int(sval)
-            elif 'Corner' in stype:
-                stats["cantos_casa"] = int(sval)
+            for s in time_data.get('statistics', []):
+                stype = str(s.get('type', '')).lower()
+                sval = s.get('value')
+                
+                if sval is None:
+                    sval = 0
+                
+                try:
+                    if isinstance(sval, str) and '%' in sval:
+                        val_int = int(sval.replace('%', '').strip())
+                    else:
+                        val_int = int(sval)
+                except:
+                    val_int = 0
 
-        # Time de fora (índice 1)
-        for s in stats_lista[1].get('statistics', []):
-            stype = s.get('type', '')
-            sval = s.get('value')
-            if sval is None:
-                continue
-                
-            if 'Possession' in stype:
-                stats["posse_fora"] = str(sval)
-            elif 'Shots on' in stype or ('Goal' in stype and 'On' in stype):
-                stats["chutes_alvo_fora"] = int(sval)
-            elif 'Shots off' in stype or 'Off Target' in stype:
-                stats["chutes_fora_fora"] = int(sval)
-            elif 'Dangerous Attacks' in stype:
-                stats["ataques_perigosos_fora"] = int(sval)
-            elif 'Corner' in stype:
-                stats["cantos_fora"] = int(sval)
-                
+                # Mapeamento ultra-flexível por palavras-chave
+                if 'possession' in stype:
+                    stats[f"posse_{sufixo}"] = str(sval) if isinstance(sval, str) else f"{sval}%"
+                elif 'on target' in stype or ('goal' in stype and 'on' in stype):
+                    stats[f"chutes_alvo_{sufixo}"] = val_int
+                elif 'off target' in stype or 'shots off' in stype or ('shoth' in stype and 'off' in stype):
+                    stats[f"chutes_fora_{sufixo}"] = val_int
+                elif 'dangerous attacks' in stype:
+                    stats[f"ataques_perigosos_{sufixo}"] = val_int
+                elif 'corner' in stype:
+                    stats[f"cantos_{sufixo}"] = val_int
+                    
     except Exception as e:
         print(f"[EXCEÇÃO ESTATÍSTICAS] Erro ao processar estatísticas do jogo {fixture_id}: {e}")
         
@@ -366,7 +361,7 @@ def processar_partidas():
 
 if __name__ == "__main__":
     print("🤖 Robô de Alertas Preditivos (Com Mapeamento Flexível) iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com o modelo gemini-3.6-flash!*")
+    enviar_alerta_telegram("🚀 *Robô atualizado com o mapeamento correto de estatísticas!*")
     
     while True:
         try:
