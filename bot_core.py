@@ -25,14 +25,16 @@ MONITORAMENTO_FEEDBACK = {}
 HISTORICO_MOMENTUM = {}  # Armazena os últimos níveis de pressão por fixture_id para gerar o gráfico visual
 
 # ==========================================
-# LISTA DE PRINCIPAIS LIGAS
+# LISTA DE PRINCIPAIS LIGAS (COM LIGAS DE TESTE ADICIONADAS)
 # ==========================================
 LIGAS_PRINCIPAIS = [
     "Copa Libertadores", "Copa Sudamericana", "UEFA Champions League", "UEFA Europa League", 
     "UEFA Conference League", "Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1",
     "Brasileiro Série A", "Brasileiro Série B", "Copa do Brasil", "Primeira Liga", "Eredivisie",
     "Championship", "Segunda Division", "Serie B", "2. Bundesliga", "Ligue 2",
-    "Liga Professional", "Primera División", "Liga MX", "Super Lig", "Pro League"
+    "Liga Professional", "Primera División", "Liga MX", "Super Lig", "Pro League",
+    # --- LIGAS ADICIONADAS PARA O TESTE AO VIVO ---
+    "Primera B", "Lengjudeildin", "Copa Paraguay", "Liga 1", "LDF", "Qualification"
 ]
 
 def validar_liga_principal(nome_liga):
@@ -181,7 +183,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
 
     prompt = (
         f"Atue como um analista estatístico profissional de apostas Live de elite. "
-        f"Analise o jogo: {liga} | {time_casa} {gols_casa} x {gols_fora} {time_fora} aos {minuto}' do 2T.\n"
+        f"Analise o jogo: {liga} | {time_casa} {gols_casa} x {gols_fora} {time_fora} aos {minuto}'.\n"
         f"Dados de campo:\n{resumo_stats}\n\n"
         f"Forneça estritamente:\n"
         f"1. Uma nota numérica inteira de 1 a 10 para o nível de pressão atual na primeira linha (apenas o número, ex: '9').\n"
@@ -313,8 +315,9 @@ def processar_partidas():
         if fixture_id in CACHE_ALERTAS_ENVIADOS:
             continue
 
-        # --- GATILHO 1: TENDÊNCIA PARA GOL (60' a 80') ---
-        if status_short in ['2H'] and 60 <= minuto <= 80:
+        # --- GATILHO 1 (MODO TESTE): TENDÊNCIA PARA GOL (QUALQUER MINUTO) ---
+        # Removi temporariamente a restrição de "60 a 80 min" para o alerta disparar agora
+        if status_short in ['1H', '2H', 'ET'] and 1 <= minuto <= 120:
             estats = extrair_estatisticas(fixture_id)
             if not estats['dados_validos']:
                 continue
@@ -325,7 +328,7 @@ def processar_partidas():
             grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
 
             mensagem = (
-                f"🚨 **TENDÊNCIA PARA GOL** 🚨\n\n"
+                f"🚨 **TENDÊNCIA PARA GOL (TESTE IA)** 🚨\n\n"
                 f"🏆 Liga: {liga}\n"
                 f"⚽ Partida: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
                 f"⏱️ Alerta aos {minuto}' • Placar {gols_casa}-{gols_fora}\n\n"
@@ -339,9 +342,9 @@ def processar_partidas():
                 f"📈 **Gráfico de Momentum:**\n"
                 f"{grafico_visual}\n\n"
                 f"🎯 Mercado Sugerido: Mais de {total_gols_atual + 0.5} Gols (Live)\n"
-                f"💡 **Análise Quantitativa:**\n"
+                f"💡 **Análise Quantitativa IA:**\n"
                 f"{analise_ia}\n\n"
-                f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
+                f"⚠️ Alerta de teste para validação da IA."
             )
             
             msg_id = enviar_alerta_telegram(mensagem)
@@ -359,55 +362,11 @@ def processar_partidas():
                 alertas_enviados_ciclo += 1
                 continue
 
-        # --- GATILHO 2: TENDÊNCIA PARA ESCANTEIOS (70' a 80') ---
-        if status_short in ['2H'] and 70 <= minuto <= 80:
-            estats = extrair_estatisticas(fixture_id)
-            if not estats['dados_validos']:
-                continue
-
-            total_cantos_atual = estats['cantos_casa'] + estats['cantos_fora']
-            nota_pressao, analise_cantos_ia = gerar_analise_inteligente(
-                liga, time_casa, time_fora, gols_casa, gols_fora, minuto, estats, tipo="escanteios"
-            )
-            grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
-
-            mensagem_cantos = (
-                f"🚩 **TENDÊNCIA PARA ESCANTEIOS** 🚩\n\n"
-                f"🏆 Liga: {liga}\n"
-                f"⚽ Partida: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-                f"⏱️ Alerta aos {minuto}' • Total de Cantos: {total_cantos_atual}\n\n"
-                f"📊 **Estatísticas de Pressão Lateral:**\n"
-                f"• Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}\n"
-                f"• Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']}\n"
-                f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
-                f"• Posse de Bola: {estats['posse_casa']} x {estats['posse_fora']}\n\n"
-                f"📈 **Gráfico de Momentum:**\n"
-                f"{grafico_visual}\n\n"
-                f"🎯 Mercado Sugerido: Mais de {total_cantos_atual + 1.5} Escanteios (Live)\n"
-                f"💡 **Análise Quantitativa:**\n"
-                f"{analise_cantos_ia}\n\n"
-                f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
-            )
-            
-            msg_id = enviar_alerta_telegram(mensagem_cantos)
-            if msg_id:
-                print(f"   [ALERTA ESCANTEIOS ENVIADO] 🚩 {time_casa} x {time_fora} aos {minuto}'")
-                CACHE_ALERTAS_ENVIADOS[fixture_id] = tempo_atual
-                MONITORAMENTO_FEEDBACK[fixture_id] = {
-                    'tipo': 'escanteios',
-                    'meta_cantos': total_cantos_atual + 2,
-                    'time_casa': time_casa,
-                    'time_fora': time_fora,
-                    'minuto_alerta': minuto,
-                    'msg_id': msg_id
-                }
-                alertas_enviados_ciclo += 1
-
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô com estatísticas clássicas (incluindo chutes totais) e Gráfico de Momentum Visual iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com Chutes Totais e Gráfico de Pressão Visual!*")
+    print("🤖 Robô em MODO TESTE (qualquer minuto) iniciado!")
+    enviar_alerta_telegram("🚀 *Robô em MODO DE TESTE - Validando Inteligência Artificial e Dados!*")
     
     while True:
         try:
