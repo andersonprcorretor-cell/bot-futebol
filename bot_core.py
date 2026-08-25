@@ -65,29 +65,87 @@ def buscar_jogos_ao_vivo():
         print(f"[EXCEÇÃO API] Erro ao buscar jogos ao vivo: {e}")
     return []
 
-def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, minuto, tipo="gols"):
-    """Usa IA para criar análise preditiva personalizada para gols ou escanteios"""
+def extrair_estatisticas(stats_lista):
+    """Extrai estatísticas detalhadas (posse, chutes, ataques perigosos, etc.) da API"""
+    stats = {
+        "posse_casa": "50%", "posse_fora": "50%",
+        "chutes_alvo_casa": 0, "chutes_alvo_fora": 0,
+        "chutes_fora_casa": 0, "chutes_fora_fora": 0,
+        "ataques_perigosos_casa": 0, "ataques_perigosos_fora": 0,
+        "cantos_casa": 0, "cantos_fora": 0
+    }
+    
+    if not stats_lista or len(stats_lista) < 2:
+        return stats
+
+    try:
+        # Time da casa (índice 0)
+        for s in stats_lista[0].get('statistics', []):
+            stype = s.get('type', '')
+            sval = s.get('value')
+            if 'Ball Possession' in stype:
+                stats["posse_casa"] = str(sval) if sval is not None else "50%"
+            elif 'Shots on Goal' in stype:
+                stats["chutes_alvo_casa"] = sval or 0
+            elif 'Shots off Goal' in stype:
+                stats["chutes_fora_casa"] = sval or 0
+            elif 'Dangerous Attacks' in stype:
+                stats["ataques_perigosos_casa"] = sval or 0
+            elif 'Corner' in stype:
+                stats["cantos_casa"] = sval or 0
+
+        # Time de fora (índice 1)
+        for s in stats_lista[1].get('statistics', []):
+            stype = s.get('type', '')
+            sval = s.get('value')
+            if 'Ball Possession' in stype:
+                stats["posse_fora"] = str(sval) if sval is not None else "50%"
+            elif 'Shots on Goal' in stype:
+                stats["chutes_alvo_fora"] = sval or 0
+            elif 'Shots off Goal' in stype:
+                stats["chutes_fora_fora"] = sval or 0
+            elif 'Dangerous Attacks' in stype:
+                stats["ataques_perigosos_fora"] = sval or 0
+            elif 'Corner' in stype:
+                stats["cantos_fora"] = sval or 0
+    except Exception as e:
+        print(f"[EXCEÇÃO ESTATÍSTICAS] Erro ao processar estatísticas: {e}")
+        
+    return stats
+
+def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, minuto, estats, tipo="gols"):
+    """Usa IA para criar análise preditiva personalizada utilizando as estatísticas detalhadas da partida"""
     if not client_ai:
         if tipo == "gols":
-            return "██████████ (100%)", "⚡ Chances claras se acumulando nos últimos minutos\n• Placar atual apontando pressão forte"
+            return "██████████ (100%)", "⚡ Chutes frequentes e pressão alta na área\n• Volume ofensivo constante nos últimos minutos"
         else:
-            return "██████████ (100%)", "• Volume ofensivo intenso pelas pontas\n• Constante busca por linhas de fundo"
+            return "██████████ (100%)", "• Constante chegada pelas pontas\n• Volume alto de cruzamentos e finalizações bloqueadas"
     
+    resumo_stats = (
+        f"Estatísticas atuais - Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
+        f"Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']} | "
+        f"Chutes Fora: {estats['chutes_fora_casa']} x {estats['chutes_fora_fora']} | "
+        f"Ataques Perigosos: {estats['ataques_perigosos_casa']} x {estats['ataques_perigosos_fora']} | "
+        f"Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}"
+    )
+
     if tipo == "gols":
         prompt = (
             f"Atue como um analista estatístico profissional de futebol e apostas Live. "
             f"Analise o jogo: {liga} | {time_casa} {gols_casa} x {gols_fora} {time_fora} aos {minuto}' do 2T.\n"
+            f"Dados estatísticos da partida:\n{resumo_stats}\n\n"
             f"Forneça estritamente:\n"
             f"1. Intensidade de pressão em barras (ex: '██████████ (100%)').\n"
-            f"2. Um texto curto e dinâmico em 2 linhas começando com '•' explicando a tendência de gols."
+            f"2. Um texto curto e dinâmico em 2 linhas começando com '•' explicando a tendência de gols com base nos dados estatísticos."
         )
     else:
         prompt = (
             f"Atue como um analista especialista no mercado de escanteios (Corners) Live. "
             f"Analise o jogo: {liga} | {time_casa} {gols_casa} x {gols_fora} {time_fora} aos {minuto}' do 2T.\n"
+            f"Dados estatísticos da partida:\n{resumo_stats}\n\n"
             f"Forneça estritamente:\n"
             f"1. Intensidade de pressão lateral em barras (ex: '██████████ (100%)').\n"
-            f"2. Um texto curto em 2 linhas começando com '•' focado em cruzamentos e escanteios."
+            f"2. Um texto curto em 2 linhas começando com '•' focado em volume de cantos e pressão pelas pontas."
         )
     
     try:
@@ -100,7 +158,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         intensidade = linhas[0] if len(linhas) > 0 else "██████████ (100%)"
         analise_linhas = "\n".join([l for l in linhas[1:] if l.strip()])
         if not analise_linhas:
-            analise_linhas = "• Alta intensidade ofensiva detectada\n• Pressão constante exercida pelos times"
+            analise_linhas = "• Alta intensidade ofensiva detectada nos números\n• Pressão constante exercida no terço final"
         return intensidade, analise_linhas
     except Exception as e:
         print(f"[EXCEÇÃO IA] Erro ao gerar análise: {e}")
@@ -133,23 +191,10 @@ def processar_partidas():
             minuto_agora = jogo_encontrado['fixture']['status']['elapsed'] or 0
             msg_id_origem = dados_fb.get('msg_id')
             
-            # Extrai estatísticas de escanteios se disponíveis na API
-            stats = jogo_encontrado.get('statistics', [])
-            cantos_casa, cantos_fora = 0, 0
-            if stats and len(stats) >= 2:
-                try:
-                    for s in stats[0].get('statistics', []):
-                        if 'Corner' in s.get('type', ''):
-                            cantos_casa = s.get('value') or 0
-                    for s in stats[1].get('statistics', []):
-                        if 'Corner' in s.get('type', ''):
-                            cantos_fora = s.get('value') or 0
-                except:
-                    pass
-            total_cantos_agora = cantos_casa + cantos_fora
+            estats_atuais = extrair_estatisticas(jogo_encontrado.get('statistics', []))
+            total_cantos_agora = estats_atuais['cantos_casa'] + estats_atuais['cantos_fora']
 
             if dados_fb['tipo'] == 'gols':
-                # Se o total de gols aumentou -> GREEN! (Com o placar atualizado incluído)
                 if total_gols_agora > dados_fb['gols_no_alerta']:
                     msg_feedback = (
                         f"✅ **GREEN / GOL CONFIRMADO!** ✅\n\n"
@@ -160,12 +205,10 @@ def processar_partidas():
                     enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
                     jogos_para_remover.append(fixture_id)
                 elif (minuto_agora - dados_fb['minuto_alerta']) > 20:
-                    # Encerra o tempo limite sem gol de Gols
                     jogos_para_remover.append(fixture_id)
                     
             elif dados_fb['tipo'] == 'escanteios':
                 meta_cantos = dados_fb['meta_cantos']
-                # Se atingiu a meta de escanteios
                 if total_cantos_agora >= meta_cantos:
                     msg_feedback = (
                         f"✅ **ESCANTEIOS BATERAM!** 🎯\n\n"
@@ -175,7 +218,6 @@ def processar_partidas():
                     enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
                     jogos_para_remover.append(fixture_id)
                 elif minuto_agora >= 88 or (minuto_agora - dados_fb['minuto_alerta']) > 20:
-                    # Jogo acabando ou tempo esgotado sem bater os cantos -> RED de cantos
                     msg_feedback = (
                         f"🔴 **ESCANTEIOS NÃO BATERAM**\n\n"
                         f"🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n"
@@ -204,20 +246,9 @@ def processar_partidas():
         minuto = jogo['fixture']['status']['elapsed'] or 0
         status_short = jogo['fixture']['status']['short']
         
-        # Extrai escanteios atuais da partida ao vivo
-        stats = jogo.get('statistics', [])
-        cantos_casa, cantos_fora = 0, 0
-        if stats and len(stats) >= 2:
-            try:
-                for s in stats[0].get('statistics', []):
-                    if 'Corner' in s.get('type', ''):
-                        cantos_casa = s.get('value') or 0
-                for s in stats[1].get('statistics', []):
-                    if 'Corner' in s.get('type', ''):
-                        cantos_fora = s.get('value') or 0
-            except:
-                pass
-        total_cantos_atual = cantos_casa + cantos_fora
+        # Extrai estatísticas completas da partida ao vivo
+        estats = extrair_estatisticas(jogo.get('statistics', []))
+        total_cantos_atual = estats['cantos_casa'] + estats['cantos_fora']
 
         # --- TRAVA ANTI-GOL ---
         if fixture_id not in CONTROLE_GOLS:
@@ -242,15 +273,21 @@ def processar_partidas():
         # --- GATILHO 1: TENDÊNCIA PARA GOL (60' a 80') ---
         if status_short in ['2H'] and 60 <= minuto <= 80:
             intensidade_pressao, analise_ia = gerar_analise_inteligente(
-                liga, time_casa, time_fora, gols_casa, gols_fora, minuto, tipo="gols"
+                liga, time_casa, time_fora, gols_casa, gols_fora, minuto, estats, tipo="gols"
             )
 
             mensagem = (
                 f"🚨 **TENDÊNCIA PARA GOL** 🚨\n\n"
                 f"🏆 Liga: {liga}\n"
                 f"⚽ Partida: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-                f"⏱️ Alerta enviado aos {minuto}' • placar {gols_casa}-{gols_fora}\n\n"
-                f"📊 Intensidade de Pressão:\n"
+                f"⏱️ Alerta enviado aos {minuto}' • Placar {gols_casa}-{gols_fora}\n\n"
+                f"📊 **Estatísticas ao Vivo:**\n"
+                f"• Posse: {estats['posse_casa']} x {estats['posse_fora']}\n"
+                f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
+                f"• Chutes para Fora: {estats['chutes_fora_casa']} x {estats['chutes_fora_fora']}\n"
+                f"• Ataques Perigosos: {estats['ataques_perigosos_casa']} x {estats['ataques_perigosos_fora']}\n"
+                f"• Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}\n\n"
+                f"📈 Intensidade de Pressão:\n"
                 f"{intensidade_pressao}\n\n"
                 f"🎯 Mercado Sugerido: Mais de {total_gols_atual + 0.5} Gols (Live)\n"
                 f"💡 O que o robô viu:\n"
@@ -277,15 +314,20 @@ def processar_partidas():
         if status_short in ['2H'] and 70 <= minuto <= 80:
             meta_sugerida = total_cantos_atual + 2
             intensidade_cantos, analise_cantos_ia = gerar_analise_inteligente(
-                liga, time_casa, time_fora, gols_casa, gols_fora, minuto, tipo="escanteios"
+                liga, time_casa, time_fora, gols_casa, gols_fora, minuto, estats, tipo="escanteios"
             )
 
             mensagem_cantos = (
                 f"🚩 **TENDÊNCIA PARA ESCANTEIOS** 🚩\n\n"
                 f"🏆 Liga: {liga}\n"
                 f"⚽ Partida: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-                f"⏱️ Alerta enviado aos {minuto}' • Cantos atuais: {cantos_casa} x {cantos_fora} (Total: {total_cantos_atual})\n\n"
-                f"📊 Intensidade Lateral:\n"
+                f"⏱️ Alerta enviado aos {minuto}' • Total de Cantos: {total_cantos_atual}\n\n"
+                f"📊 **Estatísticas ao Vivo:**\n"
+                f"• Posse: {estats['posse_casa']} x {estats['posse_fora']}\n"
+                f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
+                f"• Ataques Perigosos: {estats['ataques_perigosos_casa']} x {estats['ataques_perigosos_fora']}\n"
+                f"• Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}\n\n"
+                f"📈 Intensidade Lateral:\n"
                 f"{intensidade_cantos}\n\n"
                 f"🎯 Mercado Sugerido: Mais de {total_cantos_atual + 1.5} Escanteios (Live)\n"
                 f"💡 O que o robô viu:\n"
@@ -310,8 +352,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô de Alertas Preditivos (Gols + Escanteios + Feedbacks com Placar) iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com exibição de placar nos feedbacks de gols e escanteios!*")
+    print("🤖 Robô de Alertas Preditivos (Gols + Escanteios + Estatísticas Detalhadas) iniciado!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com o retorno das estatísticas detalhadas nos alertas de gols e escanteios!*")
     
     while True:
         try:
