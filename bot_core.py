@@ -25,14 +25,23 @@ MONITORAMENTO_FEEDBACK = {}
 HISTORICO_MOMENTUM = {}  # Armazena os últimos níveis de pressão por fixture_id para gerar o gráfico visual
 
 # ==========================================
-# LISTA DE PRINCIPAIS LIGAS (COM LIGAS DE TESTE OPCIONAIS)
+# LISTA DE PRINCIPAIS LIGAS (COM LIGAS ADICIONAIS E DE TESTE)
 # ==========================================
 LIGAS_PRINCIPAIS = [
+    # Continentais
     "Copa Libertadores", "Copa Sudamericana", "UEFA Champions League", "UEFA Europa League", 
-    "UEFA Conference League", "Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1",
-    "Brasileiro Série A", "Brasileiro Série B", "Copa do Brasil", "Primeira Liga", "Eredivisie",
-    "Championship", "Segunda Division", "Serie B", "2. Bundesliga", "Ligue 2",
-    "Liga Professional", "Primera División", "Liga MX", "Super Lig", "Pro League",
+    "UEFA Conference League",
+    # Top 5 Europeias
+    "Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1",
+    # Brasil & América do Sul
+    "Brasileiro Série A", "Brasileiro Série B", "Brasileiro Série C", "Copa do Brasil", 
+    "Liga Professional", "Copa de la Liga Profesional", "Primera División", "Categoría Primera A",
+    # Europa Secundárias & Altas Médias de Gols/Cantos
+    "Primeira Liga", "Eredivisie", "Eerste Divisie", "Championship", "Segunda Division", 
+    "Serie B", "2. Bundesliga", "Ligue 2", "Scottish Premiership", "Super Lig", "Pro League",
+    "Superligaen", "Allsvenskan", "Eliteserien",
+    # Mercados Alternativos / Globais
+    "Saudi Pro League", "MLS", "J1 League", "K League 1", "Liga MX",
     # Opcional: mantidas caso queira continuar testando com ligas menores
     "Primera B", "Lengjudeildin", "Copa Paraguay", "Liga 1", "LDF", "Qualification"
 ]
