@@ -14,7 +14,6 @@ API_KEY = os.getenv("API_KEY")
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
 LIGAS_PERMITIDAS = {
-    # Suas Ligas Originais
     71, 72,    # Brasileirão Série A e B
     39, 40,    # Premier League e Championship (Inglaterra)
     140, 141,  # La Liga e La Liga 2 (Espanha)
@@ -35,15 +34,9 @@ LIGAS_PERMITIDAS = {
     292,       # K League 1 (Coreia do Sul)
     188,       # A-League (Austrália)
     94,        # Primeira Liga (Portugal)
-
-    # Ligas Adicionadas para Teste Agora (Prints)
-    # Nota: IDs genéricos/comuns de teste para capturar sub-21, copa e femininas da API-Football
-    # Caso precise ajustar o ID exato da API do seu painel, você pode consultar depois. 
-    # Incluídos curingas de teste nas checagens abaixo para liberar geral temporariamente se desejar!
 }
 
-# MODO TESTE ATIVO: Se quiser liberar absolutamente QUALQUER liga agora para testar os gráficos, 
-# mude para True. Se quiser filtrar só pelas ligas oficiais, mude para False.
+# MODO TESTE ATIVO: Libera qualquer liga para testar os alertas e gráficos agora
 MODO_TESTE_GERAL = True 
 
 estatisticas_diarias = {
@@ -155,7 +148,7 @@ def gerar_imagem_grafico_pressao(home_name, away_name, stats_home, stats_away):
     ax.spines['left'].set_color('#555555')
 
     ax.legend(facecolor='#2e2e2e', edgecolor='none', labelcolor='white', loc='upper right')
-    plt.title("📊 Raio-X de Pressão Ao Vivo", color='white', fontsize=12, fontweight='bold', pad=10)
+    plt.title("📊 Raio-X de Pressão Ao Vivo (IA Preditiva)", color='white', fontsize=12, fontweight='bold', pad=10)
 
     for bar in ret1:
         width = bar.get_width()
@@ -243,7 +236,7 @@ def enviar_relatorio_diario():
         f"• Total de Entradas: {total_sinais}\n"
         f"• Acertos: {total_acertos} | Erros: {total_erros}\n"
         f"🎯 *Assertividade (Win Rate): {win_rate:.1f}%*\n\n"
-        f"💪 Seguimos firmes e com gestão profissional!"
+        f"💪 Seguimos firmes com IA Preditiva e gestão profissional!"
     )
     enviar_telegram_texto(relatorio)
 
@@ -258,12 +251,16 @@ def extrair_minuto_ultimo_gol(match, fallback_minute):
     return fallback_minute
 
 def main():
-    print("🤖 Robô Elite com Gráficos de Pressão em Imagem iniciado e modo teste ativo!")
+    print("🤖 Robô com IA Preditiva de Pressão iniciado com sucesso!")
+    
+    # Confirmação automática no Telegram informando que o código foi atualizado/reiniciado
+    enviar_telegram_texto("🚀 *Robô com IA Preditiva atualizado e reiniciado com sucesso!* \n📡 Conexão estabelecida e monitoramento inteligente ao vivo ativado.")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
     sinais_ativos = {} 
     controle_ultimo_gol = {} 
+    historico_ia_jogos = {} # Memória de curto prazo para calcular aceleração de pressão
     ultimo_dia_relatorio = datetime.now().date()
 
     while True:
@@ -275,7 +272,7 @@ def main():
             ultimo_dia_relatorio = agora.date()
 
         partidas = buscar_jogos_ao_vivo()
-        print(f"[{agora.strftime('%H:%M:%S')}] Varrendo {len(partidas)} partidas ao vivo...")
+        print(f"[{agora.strftime('%H:%M:%S')}] Varrendo {len(partidas)} partidas ao vivo com IA Preditiva...")
         partidas_dict = {match['fixture']['id']: match for match in partidas}
 
         # 1. CHECAGEM DE FEEDBACKS
@@ -306,11 +303,11 @@ def main():
                     tempo_para_agir = 1
 
                 feedback_msg = (
-                    f"🟢 *GOL CONFIRMADO depois do alerta!*\n"
+                    f"🟢 *GOL CONFIRMADO (IA Preditiva Acertou!)*\n"
                     f"⚽ {info['home']} {g_home} x {g_away} {info['away']} • Placar Atual\n"
-                    f"⏱️ Alerta enviado aos {info['minuto_alerta']}'\n"
+                    f"⏱️ Alerta preditivo enviado aos {info['minuto_alerta']}'\n"
                     f"⚽ Gol saiu aos {minuto_real_do_gol}'\n"
-                    f"⏳ Você teve {tempo_para_agir} minutos para agir!"
+                    f"⏳ Você teve {tempo_para_agir} minutos de antecedência para agir!"
                 )
                 enviar_telegram_texto(feedback_msg, reply_to_message_id=info['message_id'])
                 estatisticas_diarias["gols_green"] += 1
@@ -347,7 +344,7 @@ def main():
                         estatisticas_diarias["cantos_red"] += 1
                         del sinais_ativos[fixture_id]
 
-        # 2. VARREDURA DE NOVAS OPORTUNIDADES
+        # 2. VARREDURA E ANÁLISE PREDITIVA DE NOVAS OPORTUNIDADES
         for match in partidas:
             try:
                 league_id = match['league']['id']
@@ -362,14 +359,13 @@ def main():
 
                 fixture_id = match['fixture']['id']
                 home = match['teams']['home']['name']
-                away = match['teams']['home']['name'] # Proteção caso venha errado, mas vamos pegar away correto:
                 away = match['teams']['away']['name']
                 goals_home = match['goals']['home'] or 0
                 goals_away = match['goals']['away'] or 0
                 elapsed = match['fixture']['status']['elapsed'] or 0
                 gols_totais = goals_home + goals_away
 
-                print(f" -> Analisando: [{league_name}] {home} {goals_home}x{goals_away} {away} ({elapsed}')")
+                print(f" -> Analisando (IA): [{league_name}] {home} {goals_home}x{goals_away} {away} ({elapsed}')")
 
                 teve_var = any(
                     ev.get('type') == 'Var' and (elapsed - ev.get('time', {}).get('elapsed', 0)) <= 3 
@@ -414,12 +410,26 @@ def main():
                     total_chutes = total_shots_home + total_shots_away
                     total_escanteios = corners_home + corners_away
 
-                    # A. Alerta de Gols com Imagem Gráfica
-                    if not jogo_goleada and not teve_gol_recente and chave_gol not in jogos_notificados_gols:
-                        e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
-                        e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
+                    # MOTOR DE ACELERAÇÃO PREDITIVA (IA)
+                    # Compara o estado atual com a leitura anterior do mesmo jogo
+                    historico_anterior = historico_ia_jogos.get(fixture_id, {'chutes': total_chutes, 'chutes_alvo': total_chutes_alvo, 'cantos': total_escanteios})
+                    delta_chutes = total_chutes - historico_anterior['chutes']
+                    delta_chutes_alvo = total_chutes_alvo - historico_anterior['chutes_alvo']
+                    delta_cantos = total_escanteios - historico_anterior['cantos']
 
-                        if e_primeiro_tempo or e_segundo_tempo:
+                    # Atualiza memória de curto prazo
+                    historico_ia_jogos[fixture_id] = {'chutes': total_chutes, 'chutes_alvo': total_chutes_alvo, 'cantos': total_escanteios}
+
+                    # Gatilho Preditivo de Aceleração: Se o jogo acelerou repentinamente (ex: 2+ finalizações novas no ciclo)
+                    aceleracao_detectada = (delta_chutes >= 2 or delta_chutes_alvo >= 1 or delta_cantos >= 1)
+
+                    # A. Alerta de Gols com IA Preditiva e Imagem Gráfica
+                    if not jogo_goleada and not teve_gol_recente and chave_gol not in jogos_notificados_gols:
+                        # Critério base + gatilho de aceleração da IA
+                        criterio_base_1t = (17 <= elapsed <= 43) and (total_chutes_alvo >= 2 or total_chutes >= 4)
+                        criterio_base_2t = (53 <= elapsed <= 86) and (total_chutes_alvo >= 3 or total_chutes >= 10)
+
+                        if (criterio_base_1t or criterio_base_2t) and aceleracao_detectada:
                             xg_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08) + (corners_home * 0.03), 2)
                             xg_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08) + (corners_away * 0.03), 2)
 
@@ -431,16 +441,17 @@ def main():
                             img_bytes = gerar_imagem_grafico_pressao(home, away, dados_home_dict, dados_away_dict)
 
                             mensagem_gols = (
-                                f"🚨 *TENDÊNCIA PARA GOL* 🚨\n\n"
+                                f"⚡ *IA PREDITIVA: PRESSÃO IMINENTE* ⚡\n\n"
                                 f"🏆 *Liga:* {league_name}\n"
                                 f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
-                                f"⏱️ *Alerta enviado aos* {elapsed}' • placar {goals_home}-{goals_away}\n\n"
+                                f"⏱️ *Alerta antecipado aos* {elapsed}' • placar {goals_home}-{goals_away}\n\n"
                                 f"🎯 *Mercado Sugerido:* {mercado_sugerido}\n"
-                                f"💡 *O que o robô viu:*\n"
+                                f"💡 *O que a IA detectou:*\n"
+                                f"• Aceleração de ataques abrupta nos últimos instantes!\n"
                                 f"• Chutes no Alvo: {shots_on_home} x {shots_on_away}\n"
-                                f"• Finalizações Totais: {total_chutes}\n"
+                                f"• Finalizações Totais: {total_chutes} (+{delta_chutes} rec.)\n"
                                 f"• Posse de Bola: {pos_home}% x {pos_away}%\n"
-                                f"• xG Estimado: {xg_home} x {xg_away}"
+                                f"• xG Dinâmico: {xg_home} x {xg_away}"
                             )
                             
                             msg_id = enviar_telegram_com_foto(mensagem_gols, img_bytes)
@@ -458,24 +469,25 @@ def main():
                             jogos_notificados_gols.add(chave_gol)
                             time.sleep(2)
 
-                    # B. Alerta de Escanteios
+                    # B. Alerta de Escanteios com IA Preditiva
                     if chave_canto not in jogos_notificados_cantos:
-                        if 65 <= elapsed <= 85 and total_escanteios >= 8:
+                        if 63 <= elapsed <= 86 and total_escanteios >= 7 and delta_cantos >= 1:
                             meta_cantos_decimal = total_escanteios + 2.5
                             mercado_cantos = f"Mais de {meta_cantos_decimal} Cantos (Asiáticos Live)"
                             
                             dados_home_dict = {'shots_on': shots_on_home, 'total_shots': total_shots_home, 'corners': corners_home, 'possession': pos_home}
-                            dados_away_dict = {'shots_on': shots_on_away, 'total_shots': total_shots_home, 'corners': corners_away, 'possession': pos_away}
+                            dados_away_dict = {'shots_on': shots_on_away, 'total_shots': total_shots_away, 'corners': corners_away, 'possession': pos_away}
                             
                             img_bytes_canto = gerar_imagem_grafico_pressao(home, away, dados_home_dict, dados_away_dict)
 
                             mensagem_cantos = (
-                                f"🚩 *TENDÊNCIA PARA ESCANTEIOS* 🚩\n\n"
+                                f"🚩 *IA PREDITIVA: SURTO DE ESCANTEIOS* 🚩\n\n"
                                 f"🏆 *Liga:* {league_name}\n"
                                 f"⚽ *Partida:* {home} {goals_home} x {goals_away} {away}\n"
-                                f"⏱️ *Alerta enviado aos* {elapsed}' • total de cantos: {total_escanteios}\n\n"
+                                f"⏱️ *Alerta antecipado aos* {elapsed}' • total de cantos: {total_escanteios}\n\n"
                                 f"🎯 *Mercado Sugerido:* {mercado_cantos}\n"
-                                f"💡 *O que o robô viu:*\n"
+                                f"💡 *O que a IA detectou:*\n"
+                                f"• Sequência rápida de escanteios (+{delta_cantos} agora)!\n"
                                 f"• Escanteios Atuais: {corners_home} x {corners_away}\n"
                                 f"• Finalizações Totais: {total_chutes}\n"
                                 f"• Posse de Bola: {pos_home}% x {pos_away}%"
