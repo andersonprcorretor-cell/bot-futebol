@@ -86,12 +86,12 @@ def buscar_estatisticas_partida(fixture_id):
     return []
 
 def extrair_estatisticas(fixture_id):
-    """Extração clássica e robusta focada nos parâmetros reais de campo"""
+    """Extração clássica e robusta focada nos parâmetros reais de campo (incluindo chutes totais)"""
     stats = {
         "posse_casa": "50%", "posse_fora": "50%",
+        "chutes_totais_casa": 0, "chutes_totais_fora": 0,
         "chutes_alvo_casa": 0, "chutes_alvo_fora": 0,
         "chutes_fora_casa": 0, "chutes_fora_fora": 0,
-        "chutes_totais_casa": 0, "chutes_totais_fora": 0,
         "chutes_dentro_area_casa": 0, "chutes_dentro_area_fora": 0,
         "ataques_perigosos_casa": 0, "ataques_perigosos_fora": 0,
         "cantos_casa": 0, "cantos_fora": 0,
@@ -124,13 +124,14 @@ def extrair_estatisticas(fixture_id):
                 if "ball possession" in stype:
                     stats[f"posse_{sufixo}"] = str(sval) if '%' in str(sval) else f"{sval}%"
                     stats["dados_validos"] = True
+                elif "total shots" in stype:
+                    stats[f"chutes_totais_{sufixo}"] = val_limpo
+                    stats["dados_validos"] = True
                 elif "shots on goal" in stype:
                     stats[f"chutes_alvo_{sufixo}"] = val_limpo
                     stats["dados_validos"] = True
                 elif "shots off goal" in stype:
                     stats[f"chutes_fora_{sufixo}"] = val_limpo
-                elif "total shots" in stype:
-                    stats[f"chutes_totais_{sufixo}"] = val_limpo
                 elif "shots inside the box" in stype:
                     stats[f"chutes_dentro_area_{sufixo}"] = val_limpo
                 elif "dangerous attacks" in stype or "attacks" in stype:
@@ -170,9 +171,9 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
     
     resumo_stats = (
         f"Estatísticas - Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
+        f"Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']} | "
         f"Chutes Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']} | "
         f"Chutes Fora: {estats['chutes_fora_casa']} x {estats['chutes_fora_fora']} | "
-        f"Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']} | "
         f"Dentro da Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']} | "
         f"Ataques Perigosos: {estats['ataques_perigosos_casa']} x {estats['ataques_perigosos_fora']} | "
         f"Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}"
@@ -212,7 +213,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
 
 def processar_partidas():
     hora_atual = datetime.now().strftime('%H:%M:%S')
-    print(f"\n[{hora_atual}] Iniciando varredura com estatísticas clássicas e Momentum Visual...")
+    print(f"\n[{hora_atual}] Iniciando varredura com estatísticas clássicas (incluindo chutes totais) e Momentum Visual...")
     jogos = buscar_jogos_ao_vivo()
     
     if not jogos:
@@ -330,6 +331,7 @@ def processar_partidas():
                 f"⏱️ Alerta aos {minuto}' • Placar {gols_casa}-{gols_fora}\n\n"
                 f"📊 **Estatísticas Reais ao Vivo:**\n"
                 f"• Posse: {estats['posse_casa']} x {estats['posse_fora']}\n"
+                f"• Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']}\n"
                 f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
                 f"• Chutes para Fora: {estats['chutes_fora_casa']} x {estats['chutes_fora_fora']}\n"
                 f"• Chutes Dentro da Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']}\n"
@@ -376,6 +378,7 @@ def processar_partidas():
                 f"⏱️ Alerta aos {minuto}' • Total de Cantos: {total_cantos_atual}\n\n"
                 f"📊 **Estatísticas de Pressão Lateral:**\n"
                 f"• Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}\n"
+                f"• Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']}\n"
                 f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
                 f"• Posse de Bola: {estats['posse_casa']} x {estats['posse_fora']}\n\n"
                 f"📈 **Gráfico de Momentum:**\n"
@@ -403,8 +406,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô com estatísticas clássicas e Gráfico de Momentum Visual iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com parâmetros estatísticos clássicos e Gráfico de Pressão Visual!*")
+    print("🤖 Robô com estatísticas clássicas (incluindo chutes totais) e Gráfico de Momentum Visual iniciado!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com Chutes Totais e Gráfico de Pressão Visual!*")
     
     while True:
         try:
