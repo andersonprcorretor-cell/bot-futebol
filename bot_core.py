@@ -23,6 +23,28 @@ CACHE_ALERTAS_ENVIADOS = {}
 CONTROLE_GOLS = {}
 MONITORAMENTO_FEEDBACK = {}
 
+# ==========================================
+# LISTA DE PRINCIPAIS LIGAS (Foco em Alta Cobertura de Stats)
+# ==========================================
+LIGAS_PRINCIPAIS = [
+    # Internacionais / Sul-Americanas / Nacionais Brasileiras
+    "Copa Libertadores", "Copa Sudamericana", "UEFA Champions League", "UEFA Europa League", 
+    "UEFA Conference League", "Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1",
+    "Brasileiro Série A", "Brasileiro Série B", "Copa do Brasil", "Primeira Liga", "Eredivisie",
+    # Outras ligas principais europeias e mundiais
+    "Championship", "Segunda Division", "Serie B", "2. Bundesliga", "Ligue 2",
+    "Liga Professional", "Primera División", "Liga MX", "Super Lig", "Pro League"
+]
+
+def validar_liga_principal(nome_liga):
+    """Verifica se a liga está inclusa na lista de principais campeonatos"""
+    if not nome_liga:
+        return False
+    for liga in LIGAS_PRINCIPAIS:
+        if liga.lower() in nome_liga.lower():
+            return True
+    return False
+
 def enviar_alerta_telegram(mensagem, reply_to_id=None):
     """Envia o alerta formatado para o chat do Telegram e retorna o ID da mensagem enviada"""
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -63,14 +85,12 @@ def buscar_jogos_ao_vivo():
 def buscar_estatisticas_partida(fixture_id):
     """Busca estatísticas detalhadas diretamente na rota específica da API-Football"""
     url = "https://v3.football.api-sports.io/fixtures/statistics"
-    # Garantindo que o ID vai como inteiro para evitar rejeição da API
     params = {"fixture": int(fixture_id)}
     try:
         response = requests.get(url, headers=HEADERS_API, params=params, timeout=10)
         if response.status_code == 200:
             dados_json = response.json()
             resp = dados_json.get('response', [])
-            print(f"[DEBUG STATS API] Jogo {fixture_id} retornou {len(resp)} blocos de estatísticas.")
             return resp
     except Exception as e:
         print(f"[EXCEÇÃO STATS API] Erro ao buscar estatísticas do jogo {fixture_id}: {e}")
@@ -83,12 +103,12 @@ def extrair_estatisticas(fixture_id):
         "chutes_alvo_casa": 0, "chutes_alvo_fora": 0,
         "chutes_fora_casa": 0, "chutes_fora_fora": 0,
         "ataques_perigosos_casa": 0, "ataques_perigosos_fora": 0,
-        "cantos_casa": 0, "cantos_fora": 0
+        "cantos_casa": 0, "cantos_fora": 0,
+        "dados_validos": False
     }
     
     stats_lista = buscar_estatisticas_partida(fixture_id)
     if not stats_lista or len(stats_lista) < 2:
-        print(f"[AVISO] Jogo {fixture_id} sem dados estatísticos na rota /fixtures/statistics ainda.")
         return stats
 
     try:
@@ -100,13 +120,9 @@ def extrair_estatisticas(fixture_id):
                 stype = str(s.get('type', '')).strip()
                 sval = s.get('value')
                 
-                # DIAGNÓSTICO: Mostra cada scout exato recebido da API no log do Railway
-                print(f"[DEBUG SCOUT] Jogo {fixture_id} ({sufixo}) -> Tipo: '{stype}' | Valor: {sval}")
-                
                 if sval is None:
                     continue
                 
-                # Conversão segura de valores (aceita inteiros, strings com % etc)
                 val_limpo = 0
                 try:
                     if isinstance(sval, str):
@@ -116,19 +132,20 @@ def extrair_estatisticas(fixture_id):
                 except:
                     val_limpo = 0
 
-                # Mapeamento exato dos termos oficiais da API-Football
                 if stype == "Ball Possession":
                     stats[f"posse_{sufixo}"] = str(sval) if '%' in str(sval) else f"{sval}%"
+                    stats["dados_validos"] = True
                 elif stype == "Shots on Goal":
                     stats[f"chutes_alvo_{sufixo}"] = val_limpo
+                    stats["dados_validos"] = True
                 elif stype == "Shots off Goal":
                     stats[f"chutes_fora_{sufixo}"] = val_limpo
-                elif stype == "Total Shots":
-                    pass
                 elif stype == "Dangerous Attacks":
                     stats[f"ataques_perigosos_{sufixo}"] = val_limpo
+                    stats["dados_validos"] = True
                 elif stype == "Corner Kicks":
                     stats[f"cantos_{sufixo}"] = val_limpo
+                    stats["dados_validos"] = True
                     
     except Exception as e:
         print(f"[EXCEÇÃO ESTATÍSTICAS] Erro ao processar estatísticas do jogo {fixture_id}: {e}")
@@ -185,7 +202,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
 
 def processar_partidas():
     hora_atual = datetime.now().strftime('%H:%M:%S')
-    print(f"\n[{hora_atual}] Iniciando varredura de partidas...")
+    print(f"\n[{hora_atual}] Iniciando varredura de partidas nas ligas principais...")
     jogos = buscar_jogos_ao_vivo()
     
     if not jogos:
@@ -252,8 +269,13 @@ def processar_partidas():
 
     alertas_enviados_ciclo = 0
     for jogo in jogos:
-        fixture_id = jogo['fixture']['id']
         liga = jogo['league']['name']
+        
+        # FILTRO ESTREITO: Processa apenas partidas das ligas principais
+        if not validar_liga_principal(liga):
+            continue
+
+        fixture_id = jogo['fixture']['id']
         time_casa = jogo['teams']['home']['name']
         time_fora = jogo['teams']['away']['name']
         
@@ -286,6 +308,11 @@ def processar_partidas():
         # --- GATILHO 1: TENDÊNCIA PARA GOL (60' a 80') ---
         if status_short in ['2H'] and 60 <= minuto <= 80:
             estats = extrair_estatisticas(fixture_id)
+            
+            # Só dispara se houver dados estatísticos válidos e preenchidos
+            if not estats['dados_validos']:
+                continue
+
             total_cantos_atual = estats['cantos_casa'] + estats['cantos_fora']
 
             intensidade_pressao, analise_ia = gerar_analise_inteligente(
@@ -329,6 +356,11 @@ def processar_partidas():
         # --- GATILHO 2: TENDÊNCIA PARA ESCANTEIOS (70' a 80') ---
         if status_short in ['2H'] and 70 <= minuto <= 80:
             estats = extrair_estatisticas(fixture_id)
+            
+            # Só dispara se houver dados estatísticos válidos e preenchidos
+            if not estats['dados_validos']:
+                continue
+
             total_cantos_atual = estats['cantos_casa'] + estats['cantos_fora']
 
             intensidade_cantos, analise_cantos_ia = gerar_analise_inteligente(
@@ -370,8 +402,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô de Alertas Preditivos (Com Diagnóstico de Stats) iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com logs de diagnóstico de estatísticas!*")
+    print("🤖 Robô de Alertas Preditivos (Focado em Ligas Principais) iniciado!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com filtro estrito de ligas principais e validação de stats!*")
     
     while True:
         try:
