@@ -9,7 +9,6 @@ API_KEY = os.getenv("API_KEY")
 
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
-# Ligas principais globais + Ligas Noturnas das Américas adicionadas
 LIGAS_PERMITIDAS = {
     # Principais Globais / Europa / Brasil
     71, 72,    # Brasileirão Série A e B
@@ -153,11 +152,14 @@ def enviar_relatorio_diario():
     print("📢 Relatório diário enviado com sucesso!")
 
 def main():
-    print("🤖 Robô Elite (Ligas das Américas + Correções de Gols e Escanteios Asiáticos) iniciado!")
+    print("🤖 Robô Elite (Com Trava Pós-Gol e Correção de Linhas) iniciado!")
     
     jogos_notificados_gols = set()
     jogos_notificados_cantos = set()
     sinais_ativos = {} 
+    
+    # Dicionário para rastrear o minuto exato do último gol de cada partida (Trava pós-gol)
+    controle_ultimo_gol = {} 
 
     ultimo_dia_relatorio = datetime.now().date()
 
@@ -169,7 +171,7 @@ def main():
             enviar_relatorio_diario()
             ultimo_dia_relatorio = agora.date()
 
-        print(f"[{agora.strftime('%H:%M:%S')}] Varrendo partidas noturnas e checando feedbacks...")
+        print(f"[{agora.strftime('%H:%M:%S')}] Varrendo partidas e checando feedbacks...")
         partidas = buscar_jogos_ao_vivo()
         partidas_dict = {match['fixture']['id']: match for match in partidas}
 
@@ -186,6 +188,14 @@ def main():
             g_away = match_atual['goals']['away'] if match_atual['goals']['away'] is not None else 0
             gols_totais_atual = g_home + g_away
             elapsed_atual = match_atual['fixture']['status']['elapsed'] or 0
+
+            # Atualiza o rastreador de gols da partida para a trava pós-gol funcionar globalmente
+            gols_anteriores_registrados = controle_ultimo_gol.get(fixture_id, {}).get("total_gols", 0)
+            if gols_totais_atual > gols_anteriores_registrados:
+                controle_ultimo_gol[fixture_id] = {
+                    "total_gols": gols_totais_atual,
+                    "minuto_gol": elapsed_atual
+                }
 
             # Tratamento para Gols (Múltiplos Greens sequenciais)
             if info['tipo'] == 'gols' and gols_totais_atual > info['gols_no_alerta']:
@@ -207,7 +217,7 @@ def main():
                 if elapsed_atual >= 90:
                     del sinais_ativos[fixture_id]
 
-            # Tratamento Rigoroso para Escanteios (Soma real + Comparação decimal estrita)
+            # Tratamento Rigoroso para Escanteios
             elif info['tipo'] == 'cantos':
                 estatisticas_fb = buscar_estatisticas_partida(fixture_id)
                 if len(estatisticas_fb) == 2:
@@ -215,7 +225,6 @@ def main():
                     c_away = extrair_estatistica(estatisticas_fb[1]['statistics'], "Corner Kicks")
                     cantos_totais_atual = c_home + c_away
 
-                    # Validação exata: 13 cantos com meta 13.5 cairá no RED (13 >= 13.5 é falso)
                     if cantos_totais_atual >= info['meta_cantos']:
                         feedback_cantos = (
                             f"🟢 *ESCANTEIOS CONFIRMADOS!*\n"
@@ -256,14 +265,28 @@ def main():
 
                 if goals_home is None: goals_home = 0
                 if goals_away is None: goals_away = 0
+                gols_totais = goals_home + goals_away
+
+                # Atualiza o controle global de gols por partida
+                info_gol_partida = controle_ultimo_gol.get(fixture_id, {"total_gols": gols_totais, "minuto_gol": -99})
+                if gols_totais > info_gol_partida["total_gols"]:
+                    controle_ultimo_gol[fixture_id] = {
+                        "total_gols": gols_totais,
+                        "minuto_gol": elapsed if elapsed else 0
+                    }
+                    info_gol_partida = controle_ultimo_gol[fixture_id]
 
                 if elapsed:
-                    gols_totais = goals_home + goals_away
                     diferenca_gols = abs(goals_home - goals_away)
-
                     jogo_goleada = (diferenca_gols >= 3 and elapsed >= 70) or (gols_totais >= 4)
                     chave_gol = f"{fixture_id}-{elapsed // 20}"
                     chave_canto = f"canto-{fixture_id}"
+
+                    # ==========================================
+                    # TRAVA PÓS-GOL: Proíbe alerta de gol se houve gol nos últimos 10 minutos
+                    # ==========================================
+                    minuto_ultimo_gol = info_gol_partida["minuto_gol"]
+                    teve_gol_recente = (elapsed - minuto_ultimo_gol) <= 10
 
                     estatisticas = buscar_estatisticas_partida(fixture_id)
                     
@@ -284,12 +307,13 @@ def main():
                         total_chutes = total_shots_home + total_shots_away
                         total_escanteios = corners_home + corners_away
 
-                        # A. Alerta de Gols
-                        if not jogo_goleada and chave_gol not in jogos_notificados_gols:
+                        # A. Alerta de Gols (Com a nova trava anti-pós-gol e cálculo de mercado corrigido)
+                        if not jogo_goleada and not teve_gol_recente and chave_gol not in jogos_notificados_gols:
                             e_primeiro_tempo = (18 <= elapsed <= 42) and (total_chutes_alvo >= 2 or total_chutes >= 5)
                             e_segundo_tempo = (55 <= elapsed <= 85) and (total_chutes_alvo >= 4 or total_chutes >= 12)
 
                             if e_primeiro_tempo or e_segundo_tempo:
+                                # Validação dupla de segurança contra alteração de placar instantânea
                                 match_recheck = [m for m in buscar_jogos_ao_vivo() if m['fixture']['id'] == fixture_id]
                                 if match_recheck:
                                     g_h_check = match_recheck[0]['goals']['home'] or 0
@@ -301,12 +325,12 @@ def main():
                                 xg_home = round((shots_on_home * 0.35) + (total_shots_home * 0.08) + (corners_home * 0.03), 2)
                                 xg_away = round((shots_on_away * 0.35) + (total_shots_away * 0.08) + (corners_away * 0.03), 2)
 
+                                # CÁLCULO DE MERCADO CORRIGIDO E SEGURO
                                 if gols_totais == 0:
                                     mercado_sugerido = "Mais de 0.5 / 1.5 Gols (Live)"
-                                elif gols_totais == 1:
-                                    mercado_sugerido = "Mais de 1.5 / 2.5 Gols (Live)"
                                 else:
-                                    mercado_sugerido = f"Mais de {gols_totais + 1}.5 Gols (Live)"
+                                    # Se está 2x1 (3 gols), sugere Mais de 3.5 Gols (gols_totais + 0.5)
+                                    mercado_sugerido = f"Mais de {gols_totais}.5 Gols (Live)"
 
                                 barra_grafica = gerar_barra_pressao(total_chutes_alvo * 1.5 + total_chutes * 0.3)
 
@@ -342,7 +366,7 @@ def main():
                                 jogos_notificados_gols.add(chave_gol)
                                 time.sleep(2)
 
-                        # B. Alerta de Escanteios (Soma real e meta decimal segura)
+                        # B. Alerta de Escanteios
                         if chave_canto not in jogos_notificados_cantos:
                             if 65 <= elapsed <= 85 and total_escanteios >= 8:
                                 meta_cantos_decimal = total_escanteios + 2.5
