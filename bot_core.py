@@ -149,11 +149,11 @@ def processar_partidas():
             total_cantos_agora = cantos_casa + cantos_fora
 
             if dados_fb['tipo'] == 'gols':
-                # Se o total de gols aumentou -> GREEN!
+                # Se o total de gols aumentou -> GREEN! (Com o placar atualizado incluído)
                 if total_gols_agora > dados_fb['gols_no_alerta']:
                     msg_feedback = (
                         f"✅ **GREEN / GOL CONFIRMADO!** ✅\n\n"
-                        f"⚽ Partida: {dados_fb['time_casa']} x {dados_fb['time_fora']}\n"
+                        f"⚽ Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n"
                         f"⏱️ O gol saiu aos {minuto_agora}' (Alerta enviado aos {dados_fb['minuto_alerta']}')\n"
                         f"🎯 Previsão do motor estatístico validada com sucesso!"
                     )
@@ -169,7 +169,7 @@ def processar_partidas():
                 if total_cantos_agora >= meta_cantos:
                     msg_feedback = (
                         f"✅ **ESCANTEIOS BATERAM!** 🎯\n\n"
-                        f"🚩 Partida: {dados_fb['time_casa']} vs {dados_fb['time_fora']}\n"
+                        f"🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n"
                         f"⏱️ Alerta aos {minuto_alerta}' | Fechou com {total_cantos_agora} escanteios (Meta: Mais de {meta_cantos - 0.5})"
                     )
                     enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
@@ -178,7 +178,7 @@ def processar_partidas():
                     # Jogo acabando ou tempo esgotado sem bater os cantos -> RED de cantos
                     msg_feedback = (
                         f"🔴 **ESCANTEIOS NÃO BATERAM**\n\n"
-                        f"🚩 Partida: {dados_fb['time_casa']} vs {dados_fb['time_fora']}\n"
+                        f"🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n"
                         f"⏱️ Alerta aos {minuto_alerta}' | Fechou com {total_cantos_agora} escanteios (Meta: Mais de {meta_cantos - 0.5})"
                     )
                     enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
@@ -274,9 +274,8 @@ def processar_partidas():
                 continue
 
         # --- GATILHO 2: TENDÊNCIA PARA ESCANTEIOS (70' a 80') ---
-        # Sugere uma linha lógica de cantos (arredondada para cima com base no ritmo atual)
         if status_short in ['2H'] and 70 <= minuto <= 80:
-            meta_sugerida = total_cantos_atual + 2 # Exemplo de margem de segurança live
+            meta_sugerida = total_cantos_atual + 2
             intensidade_cantos, analise_cantos_ia = gerar_analise_inteligente(
                 liga, time_casa, time_fora, gols_casa, gols_fora, minuto, tipo="escanteios"
             )
@@ -311,8 +310,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô de Alertas Preditivos (Gols + Escanteios + Feedbacks Vinculados) iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com módulos de Escanteios e Feedbacks interligados!*")
+    print("🤖 Robô de Alertas Preditivos (Gols + Escanteios + Feedbacks com Placar) iniciado!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com exibição de placar nos feedbacks de gols e escanteios!*")
     
     while True:
         try:
