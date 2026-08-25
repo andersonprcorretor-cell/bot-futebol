@@ -85,7 +85,6 @@ def extrair_estatisticas(fixture_id):
     
     stats_lista = buscar_estatisticas_partida(fixture_id)
     if not stats_lista or len(stats_lista) < 2:
-        print(f"   [AVISO STATS] Jogo {fixture_id} retornou lista de estatísticas vazia da API.")
         return stats
 
     try:
@@ -98,7 +97,7 @@ def extrair_estatisticas(fixture_id):
             
             if 'Possession' in stype:
                 stats["posse_casa"] = str(sval)
-            elif 'Shots on' in stype or 'Goal' in stype and 'On' in stype: # Trata Variations de "Shots on Goal" / "Shots on Target"
+            elif 'Shots on' in stype or ('Goal' in stype and 'On' in stype):
                 stats["chutes_alvo_casa"] = int(sval)
             elif 'Shots off' in stype or 'Off Target' in stype:
                 stats["chutes_fora_casa"] = int(sval)
@@ -116,7 +115,7 @@ def extrair_estatisticas(fixture_id):
                 
             if 'Possession' in stype:
                 stats["posse_fora"] = str(sval)
-            elif 'Shots on' in stype or 'Goal' in stype and 'On' in stype:
+            elif 'Shots on' in stype or ('Goal' in stype and 'On' in stype):
                 stats["chutes_alvo_fora"] = int(sval)
             elif 'Shots off' in stype or 'Off Target' in stype:
                 stats["chutes_fora_fora"] = int(sval)
@@ -356,7 +355,7 @@ def processar_partidas():
                 MONITORAMENTO_FEEDBACK[fixture_id] = {
                     'tipo': 'escanteios',
                     'meta_cantos': total_cantos_atual + 2,
-                    *   'time_casa': time_casa,
+                    'time_casa': time_casa,
                     'time_fora': time_fora,
                     'minuto_alerta': minuto,
                     'msg_id': msg_id
