@@ -186,7 +186,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
     
     try:
         response = client_ai.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.6-flash',
             contents=prompt
         )
         texto_resposta = response.text.strip()
@@ -402,8 +402,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô de Alertas Preditivos (Focado em Ligas Principais) iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com filtro estrito de ligas principais e validação de stats!*")
+    print("🤖 Robô de Alertas Preditivos (Focado em Ligas Principais e Gemini 3.6) iniciado!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com modelo Gemini 3.6 e filtro de ligas principais!*")
     
     while True:
         try:
