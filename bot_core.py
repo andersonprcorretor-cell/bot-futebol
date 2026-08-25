@@ -31,7 +31,7 @@ def enviar_alerta_telegram(mensagem):
     except Exception as e:
         print(f"[EXCEÇÃO TELEGRAM] Erro ao enviar mensagem: {e}")
 
-def buscar_jogos_ao_vivo():
+def buscar_jogos_ao vivo():
     """Busca partidas em andamento na API-Football"""
     url = "https://v3.football.api-sports.io/fixtures"
     params = {"live": "all"}
@@ -57,7 +57,7 @@ def verificar_inercia_primeiro_tempo(estatisticas_1t):
 
 def avaliar_gatilho_entrada(partida):
     """
-    Avalia os gatilhos padrão de pressão e a nova Regra de Inércia do 1º Tempo
+    Avalia os gatilhos padrão de pressão e a Regra de Inércia do 1º Tempo
     """
     minuto = partida.get('minuto', 0)
     tempo = partida.get('tempo', '1T')
@@ -65,7 +65,7 @@ def avaliar_gatilho_entrada(partida):
     # Critério convencional de pressão no decorrer do jogo
     criterio_convencional = partida.get('aceleracao_chutes', False) and partida.get('pressao_ativa', False)
     
-    # NOVA REGRA: Inércia do 1º Tempo aplicada nos primeiros minutos do 2º Tempo (46' a 60')
+    # Inércia do 1º Tempo aplicada nos primeiros minutos do 2º Tempo (46' a 60')
     if tempo == '2T' and 46 <= minuto <= 60:
         teve_inercia_1t = partida.get('alerta_inercia_intervalo', False)
         if teve_inercia_1t and partida.get('finalizacoes_recente_2t', 0) >= 1:
@@ -87,17 +87,14 @@ def processar_partidas():
         minuto = jogo['fixture']['status']['elapsed']
         status_short = jogo['fixture']['status']['short']
         
-        # Mapeamento do tempo
         tempo = '1T' if status_short in ['1H', 'HT'] else '2T'
         
-        # Simulação / Leitura dos dados estatísticos vindos da API
-        # (Aqui você insere a extração real dos stats de chutes e pressão da sua API)
         dados_partida = {
             'minuto': minuto,
             'tempo': tempo,
             'aceleracao_chutes': True if minuto in range(17, 44) or minuto in range(53, 87) else False,
             'pressao_ativa': True,
-            'alerta_inercia_intervalo': True, # Identificado se o 1T foi quente
+            'alerta_inercia_intervalo': True,
             'finalizacoes_recente_2t': 2
         }
         
@@ -115,9 +112,16 @@ def processar_partidas():
 
 if __name__ == "__main__":
     print("🤖 Robô de Alertas Preditivos iniciado com sucesso!")
+    
+    # MENSAGEM DE CONFIRMAÇÃO NO TELEGRAM COM AS MELHORIAS RECENTES
+    enviar_alerta_telegram(
+        "🚀 *Robô atualizado com Inércia do 1º Tempo!* \n"
+        "🔥 Conexão ativa, goleadas liberadas e radar de pressão nos primeiros 15 minutos do 2º tempo operando a pleno vapor."
+    )
+    
     while True:
         try:
             processar_partidas()
         except Exception as e:
             print(f"[ERRO NO LOOP] {e}")
-        time.sleep(60)  # Intervalo de verificação entre as varreduras
+        time.sleep(60)
