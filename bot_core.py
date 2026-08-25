@@ -78,8 +78,8 @@ def buscar_estatisticas_partida(fixture_id):
         print(f"[EXCEÇÃO STATS API] Erro ao buscar estatísticas do jogo {fixture_id}: {e}")
     return []
 
-def extrair_estatisticas(jogo):
-    """Extrai e formata estatísticas detalhadas (posse, chutes, ataques perigosos, escanteios)"""
+def extrair_estatisticas(fixture_id):
+    """Extrai e formata estatísticas detalhadas consultando a API dedicada da partida"""
     stats = {
         "posse_casa": "50%", "posse_fora": "50%",
         "chutes_alvo_casa": 0, "chutes_alvo_fora": 0,
@@ -88,11 +88,7 @@ def extrair_estatisticas(jogo):
         "cantos_casa": 0, "cantos_fora": 0
     }
     
-    # Tenta pegar do próprio objeto do jogo; se não houver, busca via API dedicada
-    stats_lista = jogo.get('statistics', [])
-    if not stats_lista or len(stats_lista) < 2:
-        stats_lista = buscar_estatisticas_partida(jogo['fixture']['id'])
-
+    stats_lista = buscar_estatisticas_partida(fixture_id)
     if not stats_lista or len(stats_lista) < 2:
         return stats
 
@@ -209,7 +205,7 @@ def processar_partidas():
             minuto_agora = jogo_encontrado['fixture']['status']['elapsed'] or 0
             msg_id_origem = dados_fb.get('msg_id')
             
-            estats_atuais = extrair_estatisticas(jogo_encontrado)
+            estats_atuais = extrair_estatisticas(fixture_id)
             total_cantos_agora = estats_atuais['cantos_casa'] + estats_atuais['cantos_fora']
 
             if dados_fb['tipo'] == 'gols':
@@ -264,10 +260,6 @@ def processar_partidas():
         minuto = jogo['fixture']['status']['elapsed'] or 0
         status_short = jogo['fixture']['status']['short']
         
-        # Extrai estatísticas completas via rota dedicada da API
-        estats = extrair_estatisticas(jogo)
-        total_cantos_atual = estats['cantos_casa'] + estats['cantos_fora']
-
         # --- TRAVA ANTI-GOL ---
         if fixture_id not in CONTROLE_GOLS:
             CONTROLE_GOLS[fixture_id] = {'total_gols': total_gols_atual, 'minuto_ultimo_gol': -99}
@@ -290,6 +282,10 @@ def processar_partidas():
 
         # --- GATILHO 1: TENDÊNCIA PARA GOL (60' a 80') ---
         if status_short in ['2H'] and 60 <= minuto <= 80:
+            # Extrai estatísticas completas via rota dedicada
+            estats = extrair_estatisticas(fixture_id)
+            total_cantos_atual = estats['cantos_casa'] + estats['cantos_fora']
+
             intensidade_pressao, analise_ia = gerar_analise_inteligente(
                 liga, time_casa, time_fora, gols_casa, gols_fora, minuto, estats, tipo="gols"
             )
@@ -330,7 +326,10 @@ def processar_partidas():
 
         # --- GATILHO 2: TENDÊNCIA PARA ESCANTEIOS (70' a 80') ---
         if status_short in ['2H'] and 70 <= minuto <= 80:
+            estats = extrair_estatisticas(fixture_id)
+            total_cantos_atual = estats['cantos_casa'] + estats['cantos_fora']
             meta_sugerida = total_cantos_atual + 2
+
             intensidade_cantos, analise_cantos_ia = gerar_analise_inteligente(
                 liga, time_casa, time_fora, gols_casa, gols_fora, minuto, estats, tipo="escanteios"
             )
@@ -370,8 +369,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô de Alertas Preditivos (Gols + Escanteios + Estatísticas Reais via API) iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com busca de estatísticas reais e detalhadas direto da API-Football!*")
+    print("🤖 Robô de Alertas Preditivos (Gols + Escanteios + Estatísticas Reais) iniciado!")
+    enviar_alerta_telegram("🚀 *Robô corrigido para puxar estatísticas reais direto da API-Football!*")
     
     while True:
         try:
