@@ -163,7 +163,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
     
     try:
         response = client_ai.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.6-flash',
             contents=prompt
         )
         texto_resposta = response.text.strip()
@@ -366,7 +366,7 @@ def processar_partidas():
 
 if __name__ == "__main__":
     print("🤖 Robô de Alertas Preditivos (Com Mapeamento Flexível) iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com mapeamento flexível de estatísticas da API-Football!*")
+    enviar_alerta_telegram("🚀 *Robô atualizado com o modelo gemini-3.6-flash!*")
     
     while True:
         try:
