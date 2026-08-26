@@ -285,7 +285,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
     
     try:
         response = client_ai.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.6-flash',
             contents=prompt
         )
         texto_resposta = response.text.strip()
@@ -508,7 +508,7 @@ def processar_partidas():
                     MONITORAMENTO_FEEDBACK[chave_cantos] = {
                         'fixture_id': fixture_id,
                         'tipo': 'escanteios',
-                        'meta_cantos': meta_cantos_alvo,
+                        'meta_cantos': meta_cant_alvo,
                         'time_casa': time_casa,
                         'time_fora': time_fora,
                         'minuto_alerta': minuto,
@@ -519,8 +519,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô atualizado sem a trava de dados_validos — operando com base em minutagem e placar!")
-    enviar_alerta_telegram("🚀 *Robô atualizado: trava de estatísticas obrigatórias removida!*")
+    print("🤖 Robô atualizado com modelo gemini-3.6-flash!")
+    enviar_alerta_telegram("🚀 *Robô atualizado: modelo Gemini corrigido para gemini-3.6-flash!*")
     
     while True:
         try:
