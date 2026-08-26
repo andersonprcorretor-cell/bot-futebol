@@ -201,15 +201,20 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
     if not client_ai:
         return 8, f"• O volume ofensivo apresentado por {time_casa} e {time_fora} demonstra clara pressão territorial.\n• Os indicadores estatísticos sustentam a expectativa de movimentação no placar."
     
+    # MONTAGEM INTELIGENTE DO RESUMO PARA A IA: Só injeta xG e bloqueios se eles existirem de fato (> 0.0)
     resumo_stats = (
         f"Estatísticas - Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
         f"Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']} | "
         f"Chutes Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']} | "
         f"Dentro da Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']} | "
-        f"Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']} | "
-        f"xG: {estats_avancadas['xg_casa']} x {estats_avancadas['xg_fora']} | "
-        f"Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']}"
+        f"Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}"
     )
+
+    if estats_avancadas['xg_casa'] > 0.0 or estats_avancadas['xg_fora'] > 0.0:
+        resumo_stats += f" | xG: {estats_avancadas['xg_casa']} x {estats_avancadas['xg_fora']}"
+        
+    if estats_avancadas['chutes_bloqueados_casa'] > 0 or estats_avancadas['chutes_bloqueados_fora'] > 0:
+        resumo_stats += f" | Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']}"
 
     prompt = (
         f"Você é um Head Trader quantitativo e analista de desempenho sênior, especializado em modelagem preditiva para o mercado de {tipo.upper()} ao vivo. "
@@ -348,7 +353,6 @@ def processar_partidas():
             )
             grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
 
-            # CONSTRUÇÃO INTELIGENTE DO BLOCO DE ESTATÍSTICAS AVANÇADAS (Só exibe xG se for maior que 0.0)
             bloco_avancado_str = ""
             if estats_avancadas['xg_casa'] > 0.0 or estats_avancadas['xg_fora'] > 0.0:
                 bloco_avancado_str += f"• xG (Expectativa de Gol): {estats_avancadas['xg_casa']} x {estats_avancadas['xg_fora']}\n"
@@ -443,8 +447,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô calibrado com ocultação inteligente de xG zerado iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado: xG ocultado automaticamente quando a API não fornecer o dado!*")
+    print("🤖 Robô atualizado com isolamento total de xG zerado para a IA!")
+    enviar_alerta_telegram("🚀 *Robô atualizado: IA isolada de métricas xG zeradas/nulas!*")
     
     while True:
         try:
