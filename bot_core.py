@@ -25,7 +25,6 @@ CONTROLE_GOLS = {}
 MONITORAMENTO_FEEDBACK = {}
 HISTORICO_MOMENTUM = {}
 
-# Mude para False caso queira testar e monitorar TODAS as ligas ao vivo do mundo sem restrição de nomes
 FILTRAR_APENAS_LIGAS_PRINCIPAIS = True
 
 LIGAS_PRINCIPAIS = [
@@ -191,9 +190,6 @@ def extrair_estatisticas_avancadas(fixture_id):
         
     return stats_avancadas
 
-# ==========================================
-# MODELOS MATEMÁTICOS E PROBABILÍSTICOS
-# ==========================================
 def calcular_probabilidade_poisson(lmbda, k):
     try:
         return (math.exp(-lmbda) * (lmbda ** k)) / math.factorial(k)
@@ -294,7 +290,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
     
     try:
         response = client_ai.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.0-flash',
             contents=prompt
         )
         texto_resposta = response.text.strip()
@@ -341,7 +337,6 @@ def processar_partidas():
     tempo_atual = time.time()
     CACHE_ALERTAS_ENVIADOS = {fid: ts for fid, ts in CACHE_ALERTAS_ENVIADOS.items() if tempo_atual - ts < 1200}
 
-    # Verificação de feedbacks
     jogos_para_remover = []
     for chave_fb, dados_fb in MONITORAMENTO_FEEDBACK.items():
         fixture_id = dados_fb['fixture_id']
@@ -417,7 +412,6 @@ def processar_partidas():
         if (minuto - estado_jogo['minuto_ultimo_gol']) < 5:
             continue
             
-        # Filtro de Minutagem Ajustado (A partir dos 10' do 1T e a partir dos 10' do 2T / minuto 55)
         rolando_1t = (status_short == '1H' and 10 <= minuto <= 42)
         rolando_2t = (status_short == '2H' and 55 <= minuto <= 85)
 
@@ -479,7 +473,6 @@ def processar_partidas():
                         }
                         alertas_enviados_ciclo += 1
 
-        # Monitoramento contínuo para escanteios
         chave_cantos = f"{fixture_id}_cantos"
         if (rolando_1t or rolando_2t) and chave_cantos not in CACHE_ALERTAS_ENVIADOS:
             periodo_etapa = "1T" if status_short == '1H' else "2T"
@@ -535,8 +528,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô atualizado com minutagem otimizada (a partir de 10' e 55')!")
-    enviar_alerta_telegram("🚀 *Robô atualizado: janelas de monitoramento expandidas para começar a partir dos 10 minutos de cada tempo!*")
+    print("🤖 Robô atualizado com minutagem otimizada (a partir de 10' e 55') e Gemini 2.0 Flash!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com sucesso e operando com Gemini 2.0 Flash!*")
     
     while True:
         try:
