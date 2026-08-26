@@ -190,18 +190,21 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         f"Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}"
     )
 
+    # NOVO PROMPT ALTAMENTE PROFISSIONAL, PREDITIVO E DIRECIONADO AOS DADOS REAIS
     prompt = (
-        f"Atue obrigatoriamente como um analista estatístico profissional e especialista em apostas esportivas Live de alto nível. "
-        f"Analise detalhadamente o cenário atual da partida para o mercado de {tipo.upper()}:\n"
-        f"Competição: {liga}\n"
-        f"Confronto: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-        f"Momento: Aos {minuto}' minutos do {periodo_etapa}.\n"
-        f"Estatísticas atuais em campo:\n{resumo_stats}\n\n"
-        f"Instruções estritas para a resposta:\n"
-        f"1. Na PRIMEIRA linha, forneça apenas um número inteiro de 1 a 10 representando a intensidade da pressão atual (exemplo: '9').\n"
-        f"2. Nas linhas seguintes, elabore uma análise crítica, profunda e 100% personalizada sobre o jogo (evite frases genéricas ou repetitivas). "
-        f"Cite diretamente os números de finalizações, pressão territorial ou volume ofensivo dos times para justificar a tendência do mercado de {tipo}. "
-        f"Utilize formato de tópicos com marcadores '•' (máximo de 2 a 3 linhas objetivas e analíticas)."
+        f"Você é um analista sênior de dados de futebol e trader profissional de elite em apostas esportivas Live. "
+        f"Sua missão é entregar uma leitura técnica profunda, cirúrgica e altamente preditiva com base estritamente nos números atuais da partida.\n\n"
+        f"Contexto do Jogo:\n"
+        f"- Competição: {liga}\n"
+        f"- Confronto: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
+        f"- Momento Atual: {minuto}' do {periodo_etapa}\n"
+        f"- Foco da Análise: Mercado de {tipo.upper()}\n"
+        f"- Dados Estatísticos Atuais:\n{resumo_stats}\n\n"
+        f"Diretrizes obrigatórias para a resposta:\n"
+        f"1. Na PRIMEIRA linha, forneça exclusivamente um número inteiro de 1 a 10 indicando a força da pressão e probabilidade do sinal (exemplo: '9').\n"
+        f"2. Nas linhas seguintes, escreva exatamente 2 ou 3 tópicos iniciados por '•'.\n"
+        f"3. Cada tópico DEVE citar explicitamente os números reais do jogo (como volume de finalizações, conversão de chutes no alvo, pressão territorial ou proporção de escanteios) para sustentar a tese.\n"
+        f"4. Adote um tom de previsão analítica profissional (explicando o comportamento tático esperado das equipes nos próximos minutos com base na densidade ofensiva atual, sem usar chavões vazios ou frases genéricas)."
     )
     
     try:
@@ -226,8 +229,8 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         analise_linhas = "\n".join(linhas[indice_inicio_texto:])
         if not analise_linhas:
             analise_linhas = (
-                f"• O volume ofensivo de {time_casa} com {estats['chutes_totais_casa']} finalizações pressiona a defesa adversária.\n"
-                f"• A dinâmica aos {minuto}' do {periodo_etapa} evidencia alta probabilidade de oportunidades reais no setor."
+                f"• Com {estats['chutes_totais_casa']} finalizações e forte ocupação ofensiva, {time_casa} empurra as linhas do {time_fora}.\n"
+                f"• A densidade de ações no último terço aos {minuto}' amplia drasticamente a expectativa de conversão no setor."
             )
         return nota_num, analise_linhas
     except Exception as e:
