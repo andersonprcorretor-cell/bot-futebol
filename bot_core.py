@@ -97,7 +97,7 @@ def buscar_estatisticas_partida(fixture_id):
     return []
 
 def extrair_estatisticas(fixture_id):
-    """Extração clássica, robusta e blindada focada nos parâmetros reais de campo"""
+    """Extração clássica, robusta e blindada com mapeamento ampliado para evitar falsos zeros"""
     stats = {
         "posse_casa": "50%", "posse_fora": "50%",
         "chutes_totais_casa": 0, "chutes_totais_fora": 0,
@@ -143,7 +143,7 @@ def extrair_estatisticas(fixture_id):
                     stats["dados_validos"] = True
                 elif "shots off goal" in stype:
                     stats[f"chutes_fora_{sufixo}"] = val_limpo
-                elif "shots inside the box" in stype:
+                elif "shots inside" in stype or "inside the box" in stype:
                     stats[f"chutes_dentro_area_{sufixo}"] = val_limpo
                 elif "dangerous attacks" in stype or "attacks" in stype:
                     stats[f"ataques_perigosos_{sufixo}"] = val_limpo
@@ -159,9 +159,8 @@ def extrair_estatisticas(fixture_id):
 
 def extrair_estatisticas_avancadas(fixture_id):
     """
-    Função modular auxiliar e totalmente blindada para capturar métricas preditivas 
-    adicionais (como xG, chutes bloqueados e defesas do goleiro), caso a API forneça.
-    Se a API retornar vazio para esses campos, o código assume 0.0 sem quebrar nada.
+    Função modular auxiliar corrigida para capturar métricas preditivas 
+    (xG, chutes bloqueados e defesas) independentemente da variação de string da API.
     """
     stats_avancadas = {
         "xg_casa": 0.0, "xg_fora": 0.0,
@@ -186,16 +185,16 @@ def extrair_estatisticas_avancadas(fixture_id):
                     continue
                 
                 try:
-                    if "expected goals" in stype or "xg" in stype:
-                        stats_avancadas[f"xg_{sufixo}"] = float(str(sval).strip())
-                    elif "blocked shots" in stype:
-                        stats_avancadas[f"chutes_bloqueados_{sufixo}"] = int(float(str(sval).strip()))
+                    val_str = str(sval).strip()
+                    if "expected goals" in stype or stype == "xg":
+                        stats_avancadas[f"xg_{sufixo}"] = float(val_str)
+                    elif "blocked shots" in stype or "shots blocked" in stype:
+                        stats_avancadas[f"chutes_bloqueados_{sufixo}"] = int(float(val_str))
                     elif "goalkeeper saves" in stype or "saves" in stype:
-                        stats_avancadas[f"defesas_goleiro_{sufixo}"] = int(float(str(sval).strip()))
+                        stats_avancadas[f"defesas_goleiro_{sufixo}"] = int(float(val_str))
                 except:
                     pass
     except Exception as e:
-        # Modo silencioso: falhas em métricas avançadas nunca afetam o fluxo principal
         pass
         
     return stats_avancadas
