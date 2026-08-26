@@ -288,6 +288,12 @@ def processar_partidas():
                     
             elif dados_fb['tipo'] == 'escanteios':
                 meta_cantos = dados_fb['meta_cantos']
+                
+                # Garante que se a estatística live zerou no fim, busca mais uma vez com segurança ou valida pelo total real
+                if total_cantos_agora == 0:
+                    estats_retry = extrair_estatisticas(fixture_id)
+                    total_cantos_agora = estats_retry['cantos_casa'] + estats_retry['cantos_fora']
+                
                 if total_cantos_agora >= meta_cantos:
                     minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
                     msg_feedback = (
@@ -308,6 +314,29 @@ def processar_partidas():
                     enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
                     jogos_para_remover.append(fixture_id)
         else:
+            # Caso o jogo tenha saído da listagem live, fazemos uma última requisição direta das estatísticas finalizadas do fixture
+            fixture_id_encerrado = fixture_id
+            estats_final = extrair_estatisticas(fixture_id_encerrado)
+            total_cantos_final = estats_final['cantos_casa'] + estats_final['cantos_fora']
+            
+            meta_cantos = dados_fb['meta_cantos']
+            msg_id_origem = dados_fb.get('msg_id')
+            
+            if total_cantos_final >= meta_cantos:
+                msg_feedback = (
+                    f"✅ **ESCANTEIOS BATERAM!** 🎯\n\n"
+                    f"🚩 Partida: {dados_fb['time_casa']} x {dados_fb['time_fora']}\n"
+                    f"⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_final} escanteios (Meta: > {meta_cantos - 0.5})"
+                )
+                enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
+            else:
+                msg_feedback = (
+                    f"🔴 **ESCANTEIOS NÃO BATERAM**\n\n"
+                    f"🚩 Partida: {dados_fb['time_casa']} x {dados_fb['time_fora']}\n"
+                    f"⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_final} escanteios (Meta: > {meta_cantos - 0.5})"
+                )
+                enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
+                
             jogos_para_remover.append(fixture_id)
             
     for fid in jogos_para_remover:
