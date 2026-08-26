@@ -295,7 +295,8 @@ def processar_partidas():
 
     # Verificação de feedbacks
     jogos_para_remover = []
-    for fixture_id, dados_fb in MONITORAMENTO_FEEDBACK.items():
+    for chave_fb, dados_fb in MONITORAMENTO_FEEDBACK.items():
+        fixture_id = dados_fb['fixture_id']
         jogo_encontrado = next((j for j in jogos if j['fixture']['id'] == fixture_id), None)
         if jogo_encontrado:
             g_c = jogo_encontrado['goals']['home'] or 0
@@ -306,27 +307,31 @@ def processar_partidas():
             estats_atuais = extrair_estatisticas(fixture_id)
             total_cantos_agora = estats_atuais['cantos_casa'] + estats_atuais['cantos_fora']
 
+            # Evita avaliar no mesmo minuto do alerta
+            if minuto_agora <= dados_fb['minuto_alerta']:
+                continue
+
             if dados_fb['tipo'] == 'gols':
                 if total_gols_agora > dados_fb['gols_no_alerta']:
                     minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
                     enviar_alerta_telegram(f"✅ **GREEN / GOL CONFIRMADO!** ✅\n\n⚽ Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n⏱️ Gol aos {minuto_agora}' (Alerta aos {dados_fb['minuto_alerta']}')\n⏳ Reação: {minutos_para_agir} min", reply_to_id=msg_id_origem)
-                    jogos_para_remover.append(fixture_id)
+                    jogos_para_remover.append(chave_fb)
                 elif (minuto_agora - dados_fb['minuto_alerta']) > 15:
-                    jogos_para_remover.append(fixture_id)
+                    jogos_para_remover.append(chave_fb)
             elif dados_fb['tipo'] == 'escanteios':
                 meta_cantos = dados_fb['meta_cantos']
                 if total_cantos_agora >= meta_cantos:
                     minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
                     enviar_alerta_telegram(f"✅ **ESCANTEIOS BATERAM!** 🎯\n\n🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_agora} cantos\n⏳ Reação: {minutos_para_agir} min", reply_to_id=msg_id_origem)
-                    jogos_para_remover.append(fixture_id)
+                    jogos_para_remover.append(chave_fb)
                 elif minuto_agora >= 89 or (minuto_agora - dados_fb['minuto_alerta']) > 15:
                     enviar_alerta_telegram(f"🔴 **ESCANTEIOS NÃO BATERAM**\n\n🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_agora} cantos", reply_to_id=msg_id_origem)
-                    jogos_para_remover.append(fixture_id)
+                    jogos_para_remover.append(chave_fb)
         else:
-            jogos_para_remover.append(fixture_id)
+            jogos_para_remover.append(chave_fb)
             
-    for fid in jogos_para_remover:
-        MONITORAMENTO_FEEDBACK.pop(fid, None)
+    for chave_fb in jogos_para_remover:
+        MONITORAMENTO_FEEDBACK.pop(chave_fb, None)
 
     alertas_enviados_ciclo = 0
     for jogo in jogos:
@@ -418,7 +423,8 @@ def processar_partidas():
                     if msg_id:
                         print(f"   [ALERTA GOLS {periodo_etapa} ENVIADO] 🚨 {time_casa} x {time_fora} aos {minuto}' (Nota: {nota_pressao})")
                         CACHE_ALERTAS_ENVIADOS[chave_gols] = tempo_atual
-                        MONITORAMENTO_FEEDBACK[fixture_id] = {
+                        MONITORAMENTO_FEEDBACK[chave_gols] = {
+                            'fixture_id': fixture_id,
                             'tipo': 'gols',
                             'gols_no_alerta': total_gols_atual,
                             'time_casa': time_casa,
@@ -445,6 +451,9 @@ def processar_partidas():
                 if nota_pressao_cantos >= 6:
                     grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao_cantos)
 
+                    # Correção da linha: Se sugere Mais de (total + 1.5), precisa atingir (total + 2) para bater de forma segura
+                    meta_cantos_alvo = total_cantos_atual + 2
+
                     mensagem_cantos = (
                         f"🚩 **TENDÊNCIA PARA ESCANTEIOS ({periodo_etapa})** 🚩\n\n"
                         f"🏆 Liga: {liga}\n"
@@ -467,9 +476,10 @@ def processar_partidas():
                     if msg_id:
                         print(f"   [ALERTA ESCANTEIOS {periodo_etapa} ENVIADO] 🚩 {time_casa} x {time_fora} aos {minuto}' (Nota: {nota_pressao_cantos})")
                         CACHE_ALERTAS_ENVIADOS[chave_cantos] = tempo_atual
-                        MONITORAMENTO_FEEDBACK[fixture_id] = {
+                        MONITORAMENTO_FEEDBACK[chave_cantos] = {
+                            'fixture_id': fixture_id,
                             'tipo': 'escanteios',
-                            'meta_cantos': total_cantos_atual + 2,
+                            'meta_cantos': meta_cantos_alvo,
                             'time_casa': time_casa,
                             'time_fora': time_fora,
                             'minuto_alerta': minuto,
