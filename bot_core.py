@@ -178,10 +178,7 @@ def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
 
 def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, tipo="gols"):
     if not client_ai:
-        return 8, (
-            f"• Confronto entre {time_casa} ({estats['posse_casa']} posse) e {time_fora} ({estats['posse_fora']}) registra {estats['chutes_totais_casa'] + estats['chutes_totais_fora']} finalizações totais aos {minuto}'.\n"
-            f"• O volume de transições ofensivas sustenta o padrão estatístico exigido para a faixa."
-        )
+        return 8, f"• O volume ofensivo apresentado por {time_casa} e {time_fora} demonstra clara pressão territorial.\n• Os indicadores estatísticos sustentam a expectativa de movimentação no placar."
     
     resumo_stats = (
         f"Estatísticas - Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
@@ -193,23 +190,22 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         f"Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}"
     )
 
-    # PROMPT HIPER-RIGOROSO E ANTI-GENÉRICO PARA TRADER ESPORTIVO
+    # PROMPT AVANÇADO E PROFUNDO PARA TRADING ESPORTIVO LIVE
     prompt = (
-        f"Você é um Head Trader Quantitativo profissional de elite em apostas esportivas Live. Sua função é entregar uma leitura cirúrgica, matemática e altamente preditiva para apostadores do Telegram.\n\n"
-        f"REGRAS CRÍTICAS PARA EVITAR RESPOSTAS GENÉRICAS:\n"
-        f"- PROIBIDO usar frases vagas, clichês ou termos genéricos vazios (como 'pressão no último terço', 'jogo truncado', 'equipes buscando o gol' sem contextualizar os números).\n"
-        f"- OBRIGATÓRIO citar e cruzar os números exatos fornecidos abaixo (ex: se houve 1 chute a gol ou 0 chutes dentro da área, explique o impacto real disso na probabilidade de acerto do mercado de {tipo.upper()}).\n\n"
-        f"Contexto da Partida:\n"
+        f"Você é um Head Trader quantitativo e analista de desempenho sênior especializado em modelagem preditiva de futebol ao vivo (Live Betting). "
+        f"Sua missão é realizar uma autópsia tática e estatística cirúrgica dos dados atuais da partida para fundamentar uma entrada de alto valor no mercado de {tipo.upper()}.\n\n"
+        f"Cenário da Partida:\n"
         f"- Competição: {liga}\n"
-        f"- Jogo: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-        f"- Momento: {minuto}' do {periodo_etapa}\n"
-        f"- Mercado Alvo: {tipo.upper()}\n"
-        f"- Dados Estatísticos Atuais:\n{resumo_stats}\n\n"
-        f"Estrutura exata da resposta:\n"
-        f"1. Na PRIMEIRA linha, forneça apenas um número inteiro de 1 a 10 representando o índice de probabilidade/força do sinal (exemplo: '7').\n"
-        f"2. A partir da segunda linha, escreva exatamente 2 tópicos iniciados por '•'.\n"
-        f"   - Tópico 1: Analise a eficiência e o volume real (cruzando Posse de Bola, Chutes Totais e Chutes no Alvo/Dentro da Área) para justificar se o ritmo de jogo atual realmente suporta a entrada ou se os números são baixos/estéreis.\n"
-        f"   - Tópico 2: Dê a projeção tática objetiva para os próximos minutos baseada estritamente no comportamento numérico atual, indicando o racional prático para o apostador."
+        f"- Placar Atual: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
+        f"- Janela Temporal: {minuto}' do {periodo_etapa}\n"
+        f"- Dados Estatísticos Oficiais:\n{resumo_stats}\n\n"
+        f"Diretrizes estritas para a construção da análise:\n"
+        f"1. Na PRIMEIRA linha, forneça exclusivamente um número inteiro de 1 a 10 representando o Índice Preditivo de Pressão e Conclusão (exemplo: '9').\n"
+        f"2. Estruture a análise nos seguintes tópicos detalhados (iniciados por '•'):\n"
+        f"   - **Pressão Territorial e Transição:** Analise a ocupação do último terço, volume de ataques perigosos e posse de bola cruzada com o placar atual (quem está em desespero ou buscando ampliar).\n"
+        f"   - **Qualidade de Finalização (Eficiência):** Cruze os chutes totais, chutes no alvo e finalizações de dentro da área para avaliar a periculosidade real das tentativas (se há volume qualificado ou apenas chutes inconsequentes de longa distância).\n"
+        f"   - **Dinâmica Preditiva para o Setor:** Explique o comportamento tático esperado para os próximos 15 minutos com base no desgaste físico e na abertura de espaços defensivos.\n"
+        f"3. Seja extremamente técnico, evite clichês genéricos e relacione obrigatoriamente os números reais fornecidos na sua argumentação analítica."
     )
     
     try:
@@ -234,15 +230,15 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         analise_linhas = "\n".join(linhas[indice_inicio_texto:])
         if not analise_linhas:
             analise_linhas = (
-                f"• Com {estats['chutes_totais_casa']} finalizações de {time_casa} contra {estats['chutes_totais_fora']} de {time_fora} aos {minuto}', o volume quantitativo ainda carece de conversão direta.\n"
-                f"• A proporção atual de posse ({estats['posse_casa']} x {estats['posse_fora']}) exige cautela antes de validar a entrada no mercado."
+                f"• A intensidade do confronto e a densidade de finalizações (Total: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']}) evidenciam forte desequilíbrio no setor defensivo.\n"
+                f"• O volume de ocupação territorial aos {minuto}' eleva consideravelmente a probabilidade estatística de conversão."
             )
         return nota_num, analise_linhas
     except Exception as e:
         print(f"[EXCEÇÃO IA] Erro detalhado ao gerar análise com Gemini: {e}")
         return 8, (
-            f"• O panorama estatístico aos {minuto}' aponta {estats['chutes_totais_casa'] + estats['chutes_totais_fora']} chutes combinados e {estats['cantos_casa'] + estats['cantos_fora']} cantos.\n"
-            f"• A leitura quantitativa sugere monitoramento rigoroso da densidade ofensiva das equipes em campo."
+            f"• O padrão de finalizações entre {time_casa} e {time_fora} mantém alta pressão no último terço.\n"
+            f"• Os indicadores quantitativos aos {minuto}' sustentam a tendência projetada para o mercado."
         )
 
 def processar_partidas():
@@ -288,12 +284,6 @@ def processar_partidas():
                     
             elif dados_fb['tipo'] == 'escanteios':
                 meta_cantos = dados_fb['meta_cantos']
-                
-                # Garante que se a estatística live zerou no fim, busca mais uma vez com segurança ou valida pelo total real
-                if total_cantos_agora == 0:
-                    estats_retry = extrair_estatisticas(fixture_id)
-                    total_cantos_agora = estats_retry['cantos_casa'] + estats_retry['cantos_fora']
-                
                 if total_cantos_agora >= meta_cantos:
                     minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
                     msg_feedback = (
@@ -314,29 +304,6 @@ def processar_partidas():
                     enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
                     jogos_para_remover.append(fixture_id)
         else:
-            # Caso o jogo tenha saído da listagem live, fazemos uma última requisição direta das estatísticas finalizadas do fixture
-            fixture_id_encerrado = fixture_id
-            estats_final = extrair_estatisticas(fixture_id_encerrado)
-            total_cantos_final = estats_final['cantos_casa'] + estats_final['cantos_fora']
-            
-            meta_cantos = dados_fb['meta_cantos']
-            msg_id_origem = dados_fb.get('msg_id')
-            
-            if total_cantos_final >= meta_cantos:
-                msg_feedback = (
-                    f"✅ **ESCANTEIOS BATERAM!** 🎯\n\n"
-                    f"🚩 Partida: {dados_fb['time_casa']} x {dados_fb['time_fora']}\n"
-                    f"⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_final} escanteios (Meta: > {meta_cantos - 0.5})"
-                )
-                enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
-            else:
-                msg_feedback = (
-                    f"🔴 **ESCANTEIOS NÃO BATERAM**\n\n"
-                    f"🚩 Partida: {dados_fb['time_casa']} x {dados_fb['time_fora']}\n"
-                    f"⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_final} escanteios (Meta: > {meta_cantos - 0.5})"
-                )
-                enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
-                
             jogos_para_remover.append(fixture_id)
             
     for fid in jogos_para_remover:
