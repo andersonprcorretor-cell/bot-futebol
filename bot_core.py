@@ -190,22 +190,20 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         f"Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}"
     )
 
-    # PROMPT AVANÇADO E PROFUNDO PARA TRADING ESPORTIVO LIVE
+    # PROMPT ULTRA-ROBUSTO E ANTI-CLICHÊ PARA TRADING ESPORTIVO LIVE
     prompt = (
-        f"Você é um Head Trader quantitativo e analista de desempenho sênior especializado em modelagem preditiva de futebol ao vivo (Live Betting). "
-        f"Sua missão é realizar uma autópsia tática e estatística cirúrgica dos dados atuais da partida para fundamentar uma entrada de alto valor no mercado de {tipo.upper()}.\n\n"
-        f"Cenário da Partida:\n"
+        f"Você é um Head Trader quantitativo e analista de desempenho sênior, implacável e analítico, especializado em modelagem preditiva para o mercado de {tipo.upper()} ao vivo. "
+        f"Sua função é realizar uma autópsia tática crua e direta dos números atuais, ignorando completamente clichês ou frases feitas de comentaristas esportivos.\n\n"
+        f"Contexto Crítico da Partida:\n"
         f"- Competição: {liga}\n"
         f"- Placar Atual: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
         f"- Janela Temporal: {minuto}' do {periodo_etapa}\n"
-        f"- Dados Estatísticos Oficiais:\n{resumo_stats}\n\n"
-        f"Diretrizes estritas para a construção da análise:\n"
-        f"1. Na PRIMEIRA linha, forneça exclusivamente um número inteiro de 1 a 10 representando o Índice Preditivo de Pressão e Conclusão (exemplo: '9').\n"
-        f"2. Estruture a análise nos seguintes tópicos detalhados (iniciados por '•'):\n"
-        f"   - **Pressão Territorial e Transição:** Analise a ocupação do último terço, volume de ataques perigosos e posse de bola cruzada com o placar atual (quem está em desespero ou buscando ampliar).\n"
-        f"   - **Qualidade de Finalização (Eficiência):** Cruze os chutes totais, chutes no alvo e finalizações de dentro da área para avaliar a periculosidade real das tentativas (se há volume qualificado ou apenas chutes inconsequentes de longa distância).\n"
-        f"   - **Dinâmica Preditiva para o Setor:** Explique o comportamento tático esperado para os próximos 15 minutos com base no desgaste físico e na abertura de espaços defensivos.\n"
-        f"3. Seja extremamente técnico, evite clichês genéricos e relacione obrigatoriamente os números reais fornecidos na sua argumentação analítica."
+        f"- Métrica Estatística Bruta:\n{resumo_stats}\n\n"
+        f"Diretrizes Rígidas de Escrita e Análise:\n"
+        f"1. Na PRIMEIRA linha, forneça obrigatoriamente e exclusivamente um número inteiro de 1 a 10 representando o seu Índice de Convicção Técnica para esta entrada (exemplo: '9').\n"
+        f"2. Escreva exatamente 2 ou 3 tópicos analíticos curtos, incisivos e profundos, iniciados por '•'.\n"
+        f"3. Cada tópico DEVE cruzar variáveis (ex: correlacionar a posse com a ineficiência de chutes de longa distância, ou o impacto do placar atual no desespero defensivo do adversário).\n"
+        f"4. Proibido usar termos vagos como 'jogo movimentado', 'pressão forte' ou 'procurar o gol'. Seja cirúrgico, técnico e aponte o comportamento tático exato que justifica a oportunidade neste minuto exato."
     )
     
     try:
@@ -451,7 +449,7 @@ def processar_partidas():
 
 if __name__ == "__main__":
     print("🤖 Robô calibrado para varredura completa (Gols e Cantos em todo o jogo) iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado para monitorar Gols e Escanteios durante toda a partida!*")
+    enviar_alerta_telegram("🚀 *Robô atualizado com prompt quantitativo sênior e análises comportamentais avançadas para o Telegram!*")
     
     while True:
         try:
