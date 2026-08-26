@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import re
+import math
 from datetime import datetime
 from google import genai
 
@@ -190,6 +191,70 @@ def extrair_estatisticas_avancadas(fixture_id):
         
     return stats_avancadas
 
+# ==========================================
+# MODELOS MATEMÁTICOS E PROBABILÍSTICOS
+# ==========================================
+def calcular_probabilidade_poisson(lmbda, k):
+    """Calcula a probabilidade exata usando a Distribuição de Poisson."""
+    try:
+        return (math.exp(-lmbda) * (lmbda ** k)) / math.factorial(k)
+    except:
+        return 0.0
+
+def probabilidade_acumulada_poisson_maior(lmbda, k_atual):
+    """Calcula a probabilidade de saírem mais de k_atual eventos no restante do jogo."""
+    prob_acumulada = 0.0
+    for i in range(0, 6): # Soma para os próximos 0 a 5 eventos acima
+        prob_acumulada += calcular_probabilidade_poisson(lmbda, i)
+    return max(0.0, min(1.0, 1.0 - prob_acumulada))
+
+def projetar_escanteios_avancados(total_cantos_atuais, minuto, status_short):
+    """
+    Calcula a projeção dinâmica de escanteios por Corner Velocity e Poisson,
+    garantindo uma margem de segurança realista para evitar odds esmagadas.
+    """
+    if minuto <= 0:
+        return 0, 0.0, False
+        
+    # Ajuste padrão de tempo total estimado (considerando acréscimos)
+    minutos_totais = 45.0 if status_short == '1H' else 90.0
+    minutos_restantes = max(5.0, minutos_totais - minuto)
+    
+    # Taxa de frequência atual (cantos por minuto)
+    taxa_por_minuto = total_cantos_atuais / float(minuto)
+    
+    # Expectativa de cantos para o restante do tempo (Lambda)
+    lambda_restante = taxa_por_minuto * minutos_restantes
+    
+    # Projeção total esperada para o fim da etapa/partida
+    cantos_projetados_total = total_cantos_atuais + lambda_restante
+    
+    # Linha sugerida dinâmica com Gap mínimo de valor (+2.0 ou +2.5 cantos acima do atual)
+    # Garante que a odd seja comercialmente atrativa e justifique a entrada.
+    linha_sugerida = math.floor(total_cantos_atuais + 2.0) + 0.5
+    
+    # Probabilidade de bater a linha sugerida
+    eventos_necessarios_para_bater = max(1, int(math.ceil(linha_sugerida - total_cantos_atuais)))
+    probabilidade_sucesso = probabilidade_acumulada_poisson_maior(lambda_restante, eventos_necessarios_para_bater - 1)
+    
+    return round(cantos_projetados_total, 1), linha_sugerida, probabilidade_sucesso
+
+def projetar_gols_avancados(total_gols_atuais, minuto, status_short):
+    """Calcula a projeção e probabilidade estatística para gols no restante da partida."""
+    if minuto <= 0:
+        return 0.0, False
+        
+    minutos_totais = 45.0 if status_short == '1H' else 90.0
+    minutos_restantes = max(5.0, minutos_totais - minuto)
+    
+    taxa_por_minuto = (max(0.5, total_gols_atuais) / float(minuto)) if total_gols_atuais > 0 else 0.03
+    lambda_restante = taxa_por_minuto * minutos_restantes
+    
+    linha_sugerida = total_gols_atuais + 0.5
+    probabilidade_sucesso = probabilidade_acumulada_poisson_maior(lambda_restante, 0) # Chance de pelo menos 1 gol
+    
+    return linha_sugerida, probabilidade_sucesso
+
 def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
     global HISTORICO_MOMENTUM
     if fixture_id not in HISTORICO_MOMENTUM:
@@ -307,7 +372,6 @@ def processar_partidas():
             estats_atuais = extrair_estatisticas(fixture_id)
             total_cantos_agora = estats_atuais['cantos_casa'] + estats_atuais['cantos_fora']
 
-            # Evita avaliar no mesmo minuto do alerta
             if minuto_agora <= dados_fb['minuto_alerta']:
                 continue
 
@@ -353,7 +417,6 @@ def processar_partidas():
         
         print(f"   [MONITORANDO] {liga} | {time_casa} {gols_casa}x{gols_fora} {time_fora} | Minuto: {minuto}' ({status_short})")
         
-        # Proteção de reinicialização (Boot)
         if fixture_id not in CONTROLE_GOLS:
             CONTROLE_GOLS[fixture_id] = {
                 'total_gols': total_gols_atual, 
@@ -368,12 +431,12 @@ def processar_partidas():
             CONTROLE_GOLS[fixture_id]['minuto_ultimo_gol'] = minuto
             continue
         
-        # Cooldown de 5 minutos após o último gol
         if (minuto - estado_jogo['minuto_ultimo_gol']) < 5:
             continue
             
-        rolando_1t = (status_short == '1H' and 10 <= minuto <= 43)
-        rolando_2t = (status_short == '2H' and 48 <= minuto <= 88)
+        # Filtro de Minutagem Mínima Inteligente (Evita início de jogo e alta variância)
+        rolando_1t = (status_short == '1H' and 25 <= minuto <= 42)
+        rolando_2t = (status_short == '2H' and 65 <= minuto <= 85)
 
         chave_gols = f"{fixture_id}_gols"
         if (rolando_1t or rolando_2t) and chave_gols not in CACHE_ALERTAS_ENVIADOS:
@@ -382,14 +445,14 @@ def processar_partidas():
             
             if estats['dados_validos']:
                 estats_avancadas = extrair_estatisticas_avancadas(fixture_id)
+                _, prob_gols = projetar_gols_avancados(total_gols_atual, minuto, status_short)
 
                 nota_pressao, analise_ia = gerar_analise_inteligente(
                     liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="gols"
                 )
                 
-                print(f"      -> IA Nota Gols: {nota_pressao} para {time_casa} x {time_fora}")
-
-                if nota_pressao >= 6:
+                # Exige alta nota situacional E probabilidade matemática de Poisson favorável
+                if nota_pressao >= 7 and prob_gols >= 0.45:
                     grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
 
                     bloco_avancado_str = ""
@@ -434,7 +497,7 @@ def processar_partidas():
                         }
                         alertas_enviados_ciclo += 1
 
-        # Monitoramento contínuo para escanteios
+        # Monitoramento contínuo para escanteios com cálculo avançado
         chave_cantos = f"{fixture_id}_cantos"
         if (rolando_1t or rolando_2t) and chave_cantos not in CACHE_ALERTAS_ENVIADOS:
             periodo_etapa = "1T" if status_short == '1H' else "2T"
@@ -443,16 +506,18 @@ def processar_partidas():
             if estats['dados_validos']:
                 estats_avancadas = extrair_estatisticas_avancadas(fixture_id)
                 total_cantos_atual = estats['cantos_casa'] + estats['cantos_fora']
+                
+                # Aplicação dos modelos de Corner Velocity, Poisson e Gap de Segurança
+                _, linha_mercado_sugerida, prob_cantos = projetar_escanteios_avancados(total_cantos_atual, minuto, status_short)
 
                 nota_pressao_cantos, analise_cantos_ia = gerar_analise_inteligente(
                     liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="escanteios"
                 )
                 
-                if nota_pressao_cantos >= 6:
+                # Só dispara se a nota situacional da IA for alta E a probabilidade de Poisson validar o gap de cantos
+                if nota_pressao_cantos >= 7 and prob_cantos >= 0.40:
                     grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao_cantos)
-
-                    # Correção da linha: Se sugere Mais de (total + 1.5), precisa atingir (total + 2) para bater de forma segura
-                    meta_cantos_alvo = total_cantos_atual + 2
+                    meta_cantos_alvo = int(linha_mercado_sugerida + 0.5)
 
                     mensagem_cantos = (
                         f"🚩 **TENDÊNCIA PARA ESCANTEIOS ({periodo_etapa})** 🚩\n\n"
@@ -466,7 +531,7 @@ def processar_partidas():
                         f"• Posse de Bola: {estats['posse_casa']} x {estats['posse_fora']}\n\n"
                         f"📈 **Gráfico de Momentum:**\n"
                         f"{grafico_visual}\n\n"
-                        f"🎯 Mercado Sugerido: Mais de {total_cantos_atual + 1.5} Escanteios (Live)\n"
+                        f"🎯 Mercado Sugerido: Mais de {linha_mercado_sugerida} Escanteios (Live)\n"
                         f"💡 **Análise da Partida:**\n"
                         f"{analise_cantos_ia}\n\n"
                         f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
@@ -490,8 +555,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô atualizado com inteligência situacional personalizada na IA!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com análise situacional inteligente e restrição contra respostas repetidas!*")
+    print("🤖 Robô atualizado com inteligência de Poisson, Corner Velocity e IA situacional!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com modelos matemáticos avançados (Poisson/Velocity) e filtragem de odds de escanteios!*")
     
     while True:
         try:
