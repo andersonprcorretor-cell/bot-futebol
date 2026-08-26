@@ -199,7 +199,7 @@ def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
 
 def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="gols"):
     if not client_ai:
-        return 8, f"• O volume ofensivo de {time_casa} e {time_fora} mostra pressão forte em campo.\n• Os números indicam grande chance de gol em breve."
+        return 8, f"• O volume ofensivo apresentado por {time_casa} e {time_fora} demonstra clara pressão territorial.\n• Os indicadores estatísticos sustentam a expectativa de movimentação no placar."
     
     resumo_stats = (
         f"Estatísticas - Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
@@ -216,21 +216,22 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         resumo_stats += f" | Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']}"
 
     prompt = (
-        f"Você é um tipster e analista profissional de futebol ao vivo, especialista em trading esportivo.\n"
-        f"Faça uma análise direta, simples e focada na realidade do jogo:\n\n"
+        f"Você é um analista especialista em futebol ao vivo. "
+        f"Com base nas estatísticas atuais da partida para o mercado de {tipo.upper()}, elabore uma leitura tática de alto nível, "
+        f"mas explicada de forma natural, fluida e acessível, focando no que o jogo está de fato apresentando neste instante:\n\n"
         f"- Competição: {liga}\n"
         f"- Placar: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
         f"- Minuto: {minuto}' do {periodo_etapa}\n"
-        f"- Dados: {resumo_stats}\n\n"
-        f"Diretrizes:\n"
-        f"1. Na PRIMEIRA linha, forneça obrigatoriamente um número inteiro de 1 a 10 indicando a força/convicção da pressão (exemplo: '9').\n"
-        f"2. Escreva exatamente 2 ou 3 frases curtas e diretas iniciadas por '•', usando uma linguagem informal, comercial e fácil de entender no Telegram.\n"
-        f"3. Valorize muito finalizações de dentro da área e volume real de ataque; evite desmerecer chutes próximos ou usar termos acadêmicos/rebuscados (como 'regressão à média' ou 'mapeamento nulo'). Diga o que o jogo está mostrando de forma prática."
+        f"- Dados Estatísticos: {resumo_stats}\n\n"
+        f"Diretrizes obrigatórias:\n"
+        f"1. Na PRIMEIRA linha, forneça apenas um número inteiro de 1 a 10 indicando a força da pressão atual (exemplo: '9').\n"
+        f"2. Escreva exatamente 2 ou 3 tópicos curtos iniciados por '•'. Traduza os números frios em uma explicação clara e dinâmica da partida (ex: volume de finalizações, domínio territorial, insistência em bolas na área ou pressão sufocante), mantendo a profundidade técnica sem termos excessivamente complexos ou robóticos.\n"
+        f"3. Seja direto e evite clichês repetitivos."
     )
     
     try:
         response = client_ai.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.6-flash',
             contents=prompt
         )
         texto_resposta = response.text.strip()
@@ -249,10 +250,10 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         
         analise_linhas = "\n".join(linhas[indice_inicio_texto:])
         if not analise_linhas:
-            analise_linhas = f"• O volume de finalizações de perto mantém forte pressão no ataque.\n• O ritmo da partida aos {minuto}' aponta boas chances de movimentar o placar."
+            analise_linhas = f"• O time da casa está rondando a área adversária com intensidade.\n• O volume de jogadas perigosas aos {minuto}' justifica atenção total no mercado."
         return nota_num, analise_linhas
     except Exception as e:
-        return 8, f"• O time está rondando a área e criando volume real de perigo.\n• A pressão aos {minuto}' justifica atenção total no mercado."
+        return 8, f"• O time da casa está rondando a área adversária com intensidade.\n• O volume de jogadas perigosas aos {minuto}' justifica atenção total no mercado."
 
 def processar_partidas():
     hora_atual = datetime.now().strftime('%H:%M:%S')
@@ -373,7 +374,7 @@ def processar_partidas():
                 f"📈 **Gráfico de Momentum:**\n"
                 f"{grafico_visual}\n\n"
                 f"🎯 Mercado Sugerido: Mais de {total_gols_atual + 0.5} Gols ({periodo_etapa})\n"
-                f"💡 **Análise Quantitativa:**\n"
+                f"💡 **Análise da Partida:**\n"
                 f"{analise_ia}\n\n"
                 f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
             )
@@ -423,7 +424,7 @@ def processar_partidas():
                 f"📈 **Gráfico de Momentum:**\n"
                 f"{grafico_visual}\n\n"
                 f"🎯 Mercado Sugerido: Mais de {total_cantos_atual + 1.5} Escanteios (Live)\n"
-                f"💡 **Análise Quantitativa:**\n"
+                f"💡 **Análise da Partida:**\n"
                 f"{analise_cantos_ia}\n\n"
                 f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
             )
@@ -445,8 +446,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô atualizado: Linguagem da IA simplificada e foco real em chutes dentro da área!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com sucesso!*\n\n• Linguagem da IA ajustada para termos mais informais e diretos.\n• Correção aplicada para valorizar o volume real de finalizações de perto.")
+    print("🤖 Robô atualizado com modelo Gemini 3.6 Flash e linguagem natural fluida!")
+    enviar_alerta_telegram("🚀 *Robô atualizado na Railway: Modelo Gemini 3.6 Flash ativo com análises mais claras e naturais!*")
     
     while True:
         try:
