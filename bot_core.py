@@ -199,9 +199,8 @@ def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
 
 def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="gols"):
     if not client_ai:
-        return 8, f"• O volume ofensivo apresentado por {time_casa} e {time_fora} demonstra clara pressão territorial.\n• Os indicadores estatísticos sustentam a expectativa de movimentação no placar."
+        return 8, f"• O volume ofensivo de {time_casa} e {time_fora} mostra pressão forte em campo.\n• Os números indicam grande chance de gol em breve."
     
-    # MONTAGEM INTELIGENTE DO RESUMO PARA A IA: Só injeta xG e bloqueios se eles existirem de fato (> 0.0)
     resumo_stats = (
         f"Estatísticas - Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
         f"Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']} | "
@@ -217,21 +216,21 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         resumo_stats += f" | Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']}"
 
     prompt = (
-        f"Você é um Head Trader quantitativo e analista de desempenho sênior, especializado em modelagem preditiva para o mercado de {tipo.upper()} ao vivo. "
-        f"Faça uma análise crua e direta dos números atuais:\n\n"
+        f"Você é um tipster e analista profissional de futebol ao vivo, especialista em trading esportivo.\n"
+        f"Faça uma análise direta, simples e focada na realidade do jogo:\n\n"
         f"- Competição: {liga}\n"
         f"- Placar: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
         f"- Minuto: {minuto}' do {periodo_etapa}\n"
         f"- Dados: {resumo_stats}\n\n"
         f"Diretrizes:\n"
-        f"1. Na PRIMEIRA linha, forneça obrigatoriamente um número inteiro de 1 a 10 de convicção (exemplo: '9').\n"
-        f"2. Escreva exatamente 2 ou 3 tópicos curtos e profundos iniciados por '•'.\n"
-        f"3. Seja cirúrgico, técnico e evite clichês."
+        f"1. Na PRIMEIRA linha, forneça obrigatoriamente um número inteiro de 1 a 10 indicando a força/convicção da pressão (exemplo: '9').\n"
+        f"2. Escreva exatamente 2 ou 3 frases curtas e diretas iniciadas por '•', usando uma linguagem informal, comercial e fácil de entender no Telegram.\n"
+        f"3. Valorize muito finalizações de dentro da área e volume real de ataque; evite desmerecer chutes próximos ou usar termos acadêmicos/rebuscados (como 'regressão à média' ou 'mapeamento nulo'). Diga o que o jogo está mostrando de forma prática."
     )
     
     try:
         response = client_ai.models.generate_content(
-            model='gemini-3.6-flash',
+            model='gemini-2.5-flash',
             contents=prompt
         )
         texto_resposta = response.text.strip()
@@ -250,10 +249,10 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         
         analise_linhas = "\n".join(linhas[indice_inicio_texto:])
         if not analise_linhas:
-            analise_linhas = f"• O padrão de finalizações mantém forte pressão no último terço.\n• Os indicadores quantitativos aos {minuto}' sustentam a tendência."
+            analise_linhas = f"• O volume de finalizações de perto mantém forte pressão no ataque.\n• O ritmo da partida aos {minuto}' aponta boas chances de movimentar o placar."
         return nota_num, analise_linhas
     except Exception as e:
-        return 8, f"• O volume ofensivo mantém alta pressão territorial.\n• Os indicadores aos {minuto}' sustentam a tendência projetada."
+        return 8, f"• O time está rondando a área e criando volume real de perigo.\n• A pressão aos {minuto}' justifica atenção total no mercado."
 
 def processar_partidas():
     hora_atual = datetime.now().strftime('%H:%M:%S')
@@ -267,7 +266,6 @@ def processar_partidas():
     tempo_atual = time.time()
     CACHE_ALERTAS_ENVIADOS = {fid: ts for fid, ts in CACHE_ALERTAS_ENVIADOS.items() if tempo_atual - ts < 1200}
 
-    # Verificação de feedbacks
     jogos_para_remover = []
     for fixture_id, dados_fb in MONITORAMENTO_FEEDBACK.items():
         jogo_encontrado = next((j for j in jogos if j['fixture']['id'] == fixture_id), None)
@@ -447,8 +445,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô atualizado com isolamento total de xG zerado para a IA!")
-    enviar_alerta_telegram("🚀 *Robô atualizado: IA isolada de métricas xG zeradas/nulas!*")
+    print("🤖 Robô atualizado: Linguagem da IA simplificada e foco real em chutes dentro da área!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com sucesso!*\n\n• Linguagem da IA ajustada para termos mais informais e diretos.\n• Correção aplicada para valorizar o volume real de finalizações de perto.")
     
     while True:
         try:
