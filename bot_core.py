@@ -1,6 +1,7 @@
 import os
 import time
 import requests
+import re
 from datetime import datetime
 from google import genai
 
@@ -202,11 +203,11 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         return 8, f"• O volume ofensivo apresentado por {time_casa} e {time_fora} demonstra clara pressão territorial.\n• Os indicadores estatísticos sustentam a expectativa de movimentação no placar."
     
     resumo_stats = (
-        f"Estatísticas - Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
+        f"Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
         f"Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']} | "
-        f"Chutes Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']} | "
+        f"Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']} | "
         f"Dentro da Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']} | "
-        f"Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}"
+        f"Cantos: {estats['cantos_casa']} x {estats['cantos_fora']}"
     )
 
     if estats_avancadas['xg_casa'] > 0.0 or estats_avancadas['xg_fora'] > 0.0:
@@ -216,20 +217,23 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         resumo_stats += f" | Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']}"
 
     prompt = (
-        f"Você é um Head Trader quantitativo e analista de desempenho sênior, especializado em modelagem preditiva para o mercado de {tipo.upper()} ao vivo. "
-        f"Faça uma análise crua e direta dos números atuais:\n\n"
-        f"- Competição: {liga}\n"
-        f"- Placar: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-        f"- Minuto: {minuto}' do {periodo_etapa}\n"
-        f"- Dados: {resumo_stats}\n\n"
-        f"Diretrizes:\n"
-        f"1. Na PRIMEIRA linha, forneça obrigatoriamente um número inteiro de 1 a 10 de convicção (exemplo: '9').\n"
-        f"2. Escreva exatamente 2 ou 3 tópicos curtos e profundos iniciados por '•'.\n"
-        f"3. Seja cirúrgico, técnico e evite clichês."
+        f"Atue como um Analista Tático Sênior e Especialista Quantitativo de Futebol.\n"
+        f"Gere uma leitura situacional técnica e profunda sobre o jogo abaixo, focada no mercado de {tipo.upper()}.\n\n"
+        f"CENÁRIO DA PARTIDA:\n"
+        f"🏆 Competição: {liga}\n"
+        f"⚽ Placar: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
+        f"⏱️ Tempo: {minuto}' do {periodo_etapa}\n"
+        f"📊 Estatísticas Atuais: {resumo_stats}\n\n"
+        f"REGRAS DE FORMATAÇÃO OBRIGATÓRIAS:\n"
+        f"1. Na PRIMEIRA LINHA, escreva APENAS um número inteiro de 1 a 10 (representando a força da tendência para sair mais {tipo}).\n"
+        f"2. A partir da segunda linha, escreva EXATAMENTE 3 tópicos curtos e robustos, começando cada um com o símbolo '• '.\n"
+        f"3. Tópico 1: Analise o controle territorial, posse de bola e quem dita o ritmo do jogo no momento.\n"
+        f"4. Tópico 2: Descreva o desenho tático e transições (ex: como um time fura o bloco defensivo do outro, efetividade nos chutes de dentro da área).\n"
+        f"5. Tópico 3: Dê o veredito situacional explicando por que a dinâmica e os espaços cedidos mantêm o mercado de {tipo} muito aquecido.\n"
+        f"Use jargões táticos reais (bloco baixo, transição vertical, retenção, último terço) e seja incisivo. Nada de clichês."
     )
     
     try:
-        # CORRIGIDO PARA O MODELO VÁLIDO E RÁPIDO DA API DO GOOGLE
         response = client_ai.models.generate_content(
             model='gemini-1.5-flash',
             contents=prompt
@@ -241,20 +245,30 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         indice_inicio_texto = 0
         
         if linhas:
-            for char in linhas[0]:
-                if char.isdigit():
-                    nota_num = int(char)
-                    indice_inicio_texto = 1
-                    break
+            match = re.search(r'\d+', linhas[0])
+            if match:
+                nota_num = int(match.group())
+                indice_inicio_texto = 1
+                
         nota_num = max(1, min(10, nota_num))
         
-        analise_linhas = "\n".join(linhas[indice_inicio_texto:])
-        if not analise_linhas:
-            analise_linhas = f"• O padrão de finalizações mantém forte pressão no último terço.\n• Os indicadores quantitativos aos {minuto}' sustentam a tendência."
+        analise_linhas = "\n".join(linhas[indice_inicio_texto:]).strip()
+        
+        if len(analise_linhas) < 20:
+            analise_linhas = (
+                f"• O volume ofensivo e a criação de jogadas mantêm forte pressão territorial no último terço do campo.\n"
+                f"• A equipe que domina as ações busca frestas na marcação, gerando oportunidades reais dentro da área.\n"
+                f"• Os indicadores quantitativos aos {minuto}' sustentam plenamente a tendência projetada para {tipo}."
+            )
+            
         return nota_num, analise_linhas
     except Exception as e:
-        print(f"[ERRO IA] Falha: {e}")
-        return 8, f"• O volume ofensivo mantém alta pressão territorial.\n• Os indicadores aos {minuto}' sustentam a tendência projetada."
+        print(f"[ERRO IA] Falha na geração do conteúdo: {e}")
+        return 8, (
+            f"• A circulação de bola demonstra um padrão agressivo de tentativas de quebra de linhas defensivas.\n"
+            f"• O número de finalizações consolidadas reflete uma transição ofensiva rápida e constante.\n"
+            f"• O desenho tático aos {minuto}' favorece amplamente a expectativa no mercado de {tipo}."
+        )
 
 def processar_partidas():
     hora_atual = datetime.now().strftime('%H:%M:%S')
@@ -320,8 +334,18 @@ def processar_partidas():
         minuto = jogo['fixture']['status']['elapsed'] or 0
         status_short = jogo['fixture']['status']['short']
         
+        # ===============================================
+        # FIX: PROTEÇÃO DE REINICIALIZAÇÃO (BOOT)
+        # ===============================================
         if fixture_id not in CONTROLE_GOLS:
-            CONTROLE_GOLS[fixture_id] = {'total_gols': total_gols_atual, 'minuto_ultimo_gol': -99}
+            # Se o robô acaba de iniciar a leitura desse jogo, marcamos o minuto atual
+            # como "último gol" (se o jogo não estiver 0x0) para forçar o período
+            # de carência e evitar disparo instantâneo logo no boot da aplicação.
+            CONTROLE_GOLS[fixture_id] = {
+                'total_gols': total_gols_atual, 
+                'minuto_ultimo_gol': minuto if total_gols_atual > 0 else -99
+            }
+            continue # Pula a primeira leitura desse jogo para estabilização
             
         estado_jogo = CONTROLE_GOLS[fixture_id]
         
@@ -330,18 +354,20 @@ def processar_partidas():
             CONTROLE_GOLS[fixture_id]['minuto_ultimo_gol'] = minuto
             continue
         
-        CONTROLE_GOLS[fixture_id]['total_gols'] = total_gols_atual
-        if (minuto - estado_jogo['minuto_ultimo_gol']) < 3:
+        # FIX: COOLDOWN AUMENTADO
+        # Aumentamos a janela de carência após um gol para 5 minutos
+        if (minuto - estado_jogo['minuto_ultimo_gol']) < 5:
             continue
             
         # ===============================================
-        # LÓGICA CORRIGIDA DE ALERTAS (CHAVES SEPARADAS)
+        # LÓGICA DE ALERTAS COM JANELAS RECUADAS
         # ===============================================
         
+        # FIX: Reduzimos o limite final para dar tempo de reação (antes fechava aos 45 e 89)
         gols_1t_inicio = (status_short == '1H' and 15 <= minuto <= 25)
-        gols_1t_fim   = (status_short == '1H' and 35 <= minuto <= 45)
+        gols_1t_fim   = (status_short == '1H' and 35 <= minuto <= 41) # Termina no minuto 41
         gols_2t_inicio = (status_short == '2H' and 55 <= minuto <= 65)
-        gols_2t_fim   = (status_short == '2H' and 75 <= minuto <= 89)
+        gols_2t_fim   = (status_short == '2H' and 75 <= minuto <= 85) # Termina no minuto 85
 
         chave_gols = f"{fixture_id}_gols"
         if (gols_1t_inicio or gols_1t_fim or gols_2t_inicio or gols_2t_fim) and chave_gols not in CACHE_ALERTAS_ENVIADOS:
@@ -378,7 +404,7 @@ def processar_partidas():
                     f"📈 **Gráfico de Momentum:**\n"
                     f"{grafico_visual}\n\n"
                     f"🎯 Mercado Sugerido: Mais de {total_gols_atual + 0.5} Gols ({periodo_etapa})\n"
-                    f"💡 **Análise Quantitativa:**\n"
+                    f"💡 **Análise da Partida:**\n"
                     f"{analise_ia}\n\n"
                     f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
                 )
@@ -397,6 +423,7 @@ def processar_partidas():
                     }
                     alertas_enviados_ciclo += 1
 
+        # Escanteios podem manter a janela de tempo original pois o mercado se sustenta mais
         cantos_1t = (status_short == '1H' and 28 <= minuto <= 38)
         cantos_2t = (status_short == '2H' and 65 <= minuto <= 85)
 
@@ -427,7 +454,7 @@ def processar_partidas():
                     f"📈 **Gráfico de Momentum:**\n"
                     f"{grafico_visual}\n\n"
                     f"🎯 Mercado Sugerido: Mais de {total_cantos_atual + 1.5} Escanteios (Live)\n"
-                    f"💡 **Análise Quantitativa:**\n"
+                    f"💡 **Análise da Partida:**\n"
                     f"{analise_cantos_ia}\n\n"
                     f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
                 )
@@ -449,8 +476,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô atualizado com correção de cache e IA operacional!")
-    enviar_alerta_telegram("🚀 *Robô reiniciado: IA Gemini estabilizada e bloqueio de escanteios corrigido!*")
+    print("🤖 Robô atualizado com IA Tática Avançada, Cooldown Aprimorado e Janelas Recuadas!")
+    enviar_alerta_telegram("🚀 *Robô atualizado: Refinamento de timming das análises e proteção anti-delay ativados!*")
     
     while True:
         try:
