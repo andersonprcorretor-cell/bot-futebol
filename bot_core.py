@@ -24,25 +24,26 @@ CONTROLE_GOLS = {}
 MONITORAMENTO_FEEDBACK = {}
 HISTORICO_MOMENTUM = {}
 
+# Mude para False caso queira testar e monitorar TODAS as ligas ao vivo do mundo sem restrição de nomes
+FILTRAR_APENAS_LIGAS_PRINCIPAIS = True
+
 LIGAS_PRINCIPAIS = [
-    "Copa Libertadores", "Libertadores", "Copa Sudamericana", "Sudamericana", 
-    "UEFA Champions League", "Champions League", "UEFA Europa League", "Europa League", 
-    "UEFA Conference League", "Conference League", "Serie A", "Premier League", 
-    "La Liga", "Bundesliga", "Ligue 1", "Brasileiro Série A", "Brasileiro Série B", 
-    "Brasileiro Série C", "Copa do Brasil", "Liga Professional", "Copa de la Liga Profesional", 
-    "Primera División", "Primera Division", "Categoría Primera A", "Primeira Liga", 
-    "Eredivisie", "Eerste Divisie", "Championship", "Segunda Division", "Serie B", 
-    "2. Bundesliga", "Ligue 2", "Scottish Premiership", "Super Lig", "Pro League",
-    "Superligaen", "Allsvenskan", "Eliteserien", "Saudi Pro League", "MLS", "J1 League", 
-    "K League 1", "Liga MX", "Primera B", "Lengjudeildin", "Copa Paraguay", "Liga 1", "LDF", "Qualification"
+    "libertadores", "sudamericana", "champions", "europa league", "conference", 
+    "premier league", "la liga", "bundesliga", "ligue 1", "serie a", "serie b",
+    "brasileiro", "copa do brasil", "liga professional", "primera division", 
+    "primera", "primeira liga", "eredivisie", "championship", "segunda", 
+    "super lig", "pro league", "superligaen", "allsvenskan", "eliteserien", 
+    "saudi professional league", "mls", "j1 league", "k league", "liga mx", "liga 1"
 ]
 
 def validar_liga_principal(nome_liga):
+    if not FILTRAR_APENAS_LIGAS_PRINCIPAIS:
+        return True
     if not nome_liga:
         return False
     nome_lower = nome_liga.lower()
-    for liga in LIGAS_PRINCIPAIS:
-        if liga.lower() in nome_lower:
+    for termo in LIGAS_PRINCIPAIS:
+        if termo in nome_lower:
             return True
     return False
 
@@ -60,6 +61,8 @@ def enviar_alerta_telegram(mensagem, reply_to_id=None):
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
             return response.json().get("result", {}).get("message_id")
+        else:
+            print(f"[ERRO TELEGRAM] Status {response.status_code}: {response.text}")
     except Exception as e:
         print(f"[EXCEÇÃO TELEGRAM] Erro ao enviar mensagem: {e}")
     return None
@@ -70,7 +73,11 @@ def buscar_jogos_ao_vivo():
     try:
         response = requests.get(url, headers=HEADERS_API, params=params, timeout=15)
         if response.status_code == 200:
-            return response.json().get('response', [])
+            dados = response.json().get('response', [])
+            print(f"[API] Total de jogos ao vivo retornados pela API: {len(dados)}")
+            return dados
+        else:
+            print(f"[ERRO API JOGOS] Status {response.status_code}: {response.text}")
     except Exception as e:
         print(f"[EXCEÇÃO API] Erro ao buscar jogos ao vivo: {e}")
     return []
@@ -254,14 +261,13 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
                 indice_inicio_texto = 1
                 
         nota_num = max(1, min(10, nota_num))
-        
         analise_linhas = "\n".join(linhas[indice_inicio_texto:]).strip()
         
         if len(analise_linhas) < 20:
             analise_linhas = (
                 f"• O volume ofensivo e a criação de jogadas mantêm forte pressão territorial no último terço do campo.\n"
                 f"• A equipe que domina as ações busca frestas na marcação, gerando oportunidades reais dentro da área.\n"
-                f"• Os indicadores quantitativos aos {minuto}' sustentam plenamente a tendência projetada para {tipo}."
+                f"• Os indicadores quantitativos aos {minuto}' sustentam plenamente a expectativa de movimentação no placar."
             )
             
         return nota_num, analise_linhas
@@ -279,6 +285,7 @@ def processar_partidas():
     jogos = buscar_jogos_ao_vivo()
     
     if not jogos:
+        print("[AVISO] Nenhum jogo ao vivo retornado pela API neste ciclo.")
         return
 
     global CACHE_ALERTAS_ENVIADOS, CONTROLE_GOLS, MONITORAMENTO_FEEDBACK
@@ -323,6 +330,7 @@ def processar_partidas():
     alertas_enviados_ciclo = 0
     for jogo in jogos:
         liga = jogo['league']['name']
+        
         if not validar_liga_principal(liga):
             continue
 
@@ -336,6 +344,8 @@ def processar_partidas():
         
         minuto = jogo['fixture']['status']['elapsed'] or 0
         status_short = jogo['fixture']['status']['short']
+        
+        print(f"   [MONITORANDO] {liga} | {time_casa} {gols_casa}x{gols_fora} {time_fora} | Minuto: {minuto}' ({status_short})")
         
         # Proteção de reinicialização (Boot)
         if fixture_id not in CONTROLE_GOLS:
@@ -356,9 +366,6 @@ def processar_partidas():
         if (minuto - estado_jogo['minuto_ultimo_gol']) < 5:
             continue
             
-        # ===============================================
-        # MONITORAMENTO CONTÍNUO DURANTE A PARTIDA INTEIRA
-        # ===============================================
         rolando_1t = (status_short == '1H' and 10 <= minuto <= 43)
         rolando_2t = (status_short == '2H' and 48 <= minuto <= 88)
 
@@ -370,13 +377,14 @@ def processar_partidas():
             if estats['dados_validos']:
                 estats_avancadas = extrair_estatisticas_avancadas(fixture_id)
 
-                # Análise da IA
                 nota_pressao, analise_ia = gerar_analise_inteligente(
                     liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="gols"
                 )
                 
-                # FILTRO DE TENDÊNCIA REAL: Só dispara se a nota da IA for alta (>= 7)
-                if nota_pressao >= 7:
+                print(f"      -> IA Nota Gols: {nota_pressao} para {time_casa} x {time_fora}")
+
+                # Reduzido temporariamente para 6 para garantir disparos iniciais de teste
+                if nota_pressao >= 6:
                     grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
 
                     bloco_avancado_str = ""
@@ -420,7 +428,7 @@ def processar_partidas():
                         }
                         alertas_enviados_ciclo += 1
 
-        # Monitoramento contínuo para escanteios também durante toda a partida
+        # Monitoramento contínuo para escanteios
         chave_cantos = f"{fixture_id}_cantos"
         if (rolando_1t or rolando_2t) and chave_cantos not in CACHE_ALERTAS_ENVIADOS:
             periodo_etapa = "1T" if status_short == '1H' else "2T"
@@ -434,8 +442,7 @@ def processar_partidas():
                     liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="escanteios"
                 )
                 
-                # Só dispara escanteios se a IA indicar alta pressão lateral (nota >= 7)
-                if nota_pressao_cantos >= 7:
+                if nota_pressao_cantos >= 6:
                     grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao_cantos)
 
                     mensagem_cantos = (
@@ -473,8 +480,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô atualizado: Varredura contínua em toda a partida com filtro inteligente por nota da IA!")
-    enviar_alerta_telegram("🚀 *Robô atualizado: Monitoramento ativo em tempo integral com validação analítica rigorosa!*")
+    print("🤖 Robô atualizado com logs de diagnóstico e validação flexível de ligas!")
+    enviar_alerta_telegram("🚀 *Robô reiniciado e conectado com sucesso ao sistema de monitoramento contínuo!*")
     
     while True:
         try:
