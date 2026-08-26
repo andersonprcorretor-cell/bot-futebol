@@ -190,21 +190,22 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         f"Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}"
     )
 
-    # NOVO PROMPT ALTAMENTE PROFISSIONAL, PREDITIVO E DIRECIONADO AOS DADOS REAIS
+    # PROMPT AVANÇADO E PROFUNDO PARA TRADING ESPORTIVO LIVE
     prompt = (
-        f"Você é um analista sênior de dados de futebol e trader profissional de elite em apostas esportivas Live. "
-        f"Sua missão é entregar uma leitura técnica profunda, cirúrgica e altamente preditiva com base estritamente nos números atuais da partida.\n\n"
-        f"Contexto do Jogo:\n"
+        f"Você é um Head Trader quantitativo e analista de desempenho sênior especializado em modelagem preditiva de futebol ao vivo (Live Betting). "
+        f"Sua missão é realizar uma autópsia tática e estatística cirúrgica dos dados atuais da partida para fundamentar uma entrada de alto valor no mercado de {tipo.upper()}.\n\n"
+        f"Cenário da Partida:\n"
         f"- Competição: {liga}\n"
-        f"- Confronto: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-        f"- Momento Atual: {minuto}' do {periodo_etapa}\n"
-        f"- Foco da Análise: Mercado de {tipo.upper()}\n"
-        f"- Dados Estatísticos Atuais:\n{resumo_stats}\n\n"
-        f"Diretrizes obrigatórias para a resposta:\n"
-        f"1. Na PRIMEIRA linha, forneça exclusivamente um número inteiro de 1 a 10 indicando a força da pressão e probabilidade do sinal (exemplo: '9').\n"
-        f"2. Nas linhas seguintes, escreva exatamente 2 ou 3 tópicos iniciados por '•'.\n"
-        f"3. Cada tópico DEVE citar explicitamente os números reais do jogo (como volume de finalizações, conversão de chutes no alvo, pressão territorial ou proporção de escanteios) para sustentar a tese.\n"
-        f"4. Adote um tom de previsão analítica profissional (explicando o comportamento tático esperado das equipes nos próximos minutos com base na densidade ofensiva atual, sem usar chavões vazios ou frases genéricas)."
+        f"- Placar Atual: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
+        f"- Janela Temporal: {minuto}' do {periodo_etapa}\n"
+        f"- Dados Estatísticos Oficiais:\n{resumo_stats}\n\n"
+        f"Diretrizes estritas para a construção da análise:\n"
+        f"1. Na PRIMEIRA linha, forneça exclusivamente um número inteiro de 1 a 10 representando o Índice Preditivo de Pressão e Conclusão (exemplo: '9').\n"
+        f"2. Estruture a análise nos seguintes tópicos detalhados (iniciados por '•'):\n"
+        f"   - **Pressão Territorial e Transição:** Analise a ocupação do último terço, volume de ataques perigosos e posse de bola cruzada com o placar atual (quem está em desespero ou buscando ampliar).\n"
+        f"   - **Qualidade de Finalização (Eficiência):** Cruze os chutes totais, chutes no alvo e finalizações de dentro da área para avaliar a periculosidade real das tentativas (se há volume qualificado ou apenas chutes inconsequentes de longa distância).\n"
+        f"   - **Dinâmica Preditiva para o Setor:** Explique o comportamento tático esperado para os próximos 15 minutos com base no desgaste físico e na abertura de espaços defensivos.\n"
+        f"3. Seja extremamente técnico, evite clichês genéricos e relacione obrigatoriamente os números reais fornecidos na sua argumentação analítica."
     )
     
     try:
@@ -229,15 +230,15 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         analise_linhas = "\n".join(linhas[indice_inicio_texto:])
         if not analise_linhas:
             analise_linhas = (
-                f"• Com {estats['chutes_totais_casa']} finalizações e forte ocupação ofensiva, {time_casa} empurra as linhas do {time_fora}.\n"
-                f"• A densidade de ações no último terço aos {minuto}' amplia drasticamente a expectativa de conversão no setor."
+                f"• A intensidade do confronto e a densidade de finalizações (Total: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']}) evidenciam forte desequilíbrio no setor defensivo.\n"
+                f"• O volume de ocupação territorial aos {minuto}' eleva consideravelmente a probabilidade estatística de conversão."
             )
         return nota_num, analise_linhas
     except Exception as e:
         print(f"[EXCEÇÃO IA] Erro detalhado ao gerar análise com Gemini: {e}")
         return 8, (
-            f"• A intensidade do confronto entre {time_casa} e {time_fora} gera volume constante no setor ofensivo.\n"
-            f"• Os dados de finalizações e pressão aos {minuto}' sustentam o padrão estatístico esperado."
+            f"• O padrão de finalizações entre {time_casa} e {time_fora} mantém alta pressão no último terço.\n"
+            f"• Os indicadores quantitativos aos {minuto}' sustentam a tendência projetada para o mercado."
         )
 
 def processar_partidas():
