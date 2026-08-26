@@ -16,34 +16,22 @@ HEADERS_API = {
     'x-apisports-key': FOOTBALL_API_KEY
 }
 
-# Inicializa o cliente da Inteligência Artificial (Google GenAI)
 client_ai = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY and GEMINI_API_KEY != "SUA_GEMINI_API_KEY_AQUI" else None
 
 CACHE_ALERTAS_ENVIADOS = {}
 CONTROLE_GOLS = {}
 MONITORAMENTO_FEEDBACK = {}
-HISTORICO_MOMENTUM = {}  # Armazena os últimos níveis de pressão por fixture_id para gerar o gráfico visual
+HISTORICO_MOMENTUM = {}
 
-# ==========================================
-# LISTA DE PRINCIPAIS LIGAS (COM LIGAS ADICIONAIS E DE TESTE)
-# ==========================================
 LIGAS_PRINCIPAIS = [
-    # Continentais
     "Copa Libertadores", "Copa Sudamericana", "UEFA Champions League", "UEFA Europa League", 
-    "UEFA Conference League",
-    # Top 5 Europeias
-    "Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1",
-    # Brasil & América do Sul
+    "UEFA Conference League", "Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1",
     "Brasileiro Série A", "Brasileiro Série B", "Brasileiro Série C", "Copa do Brasil", 
     "Liga Professional", "Copa de la Liga Profesional", "Primera División", "Categoría Primera A",
-    # Europa Secundárias & Altas Médias de Gols/Cantos
     "Primeira Liga", "Eredivisie", "Eerste Divisie", "Championship", "Segunda Division", 
     "Serie B", "2. Bundesliga", "Ligue 2", "Scottish Premiership", "Super Lig", "Pro League",
-    "Superligaen", "Allsvenskan", "Eliteserien",
-    # Mercados Alternativos / Globais
-    "Saudi Pro League", "MLS", "J1 League", "K League 1", "Liga MX",
-    # Opcional: mantidas caso queira continuar testando com ligas menores
-    "Primera B", "Lengjudeildin", "Copa Paraguay", "Liga 1", "LDF", "Qualification"
+    "Superligaen", "Allsvenskan", "Eliteserien", "Saudi Pro League", "MLS", "J1 League", 
+    "K League 1", "Liga MX", "Primera B", "Lengjudeildin", "Copa Paraguay", "Liga 1", "LDF", "Qualification"
 ]
 
 def validar_liga_principal(nome_liga):
@@ -68,8 +56,6 @@ def enviar_alerta_telegram(mensagem, reply_to_id=None):
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
             return response.json().get("result", {}).get("message_id")
-        else:
-            print(f"[ERRO TELEGRAM] Código {response.status_code}: {response.text}")
     except Exception as e:
         print(f"[EXCEÇÃO TELEGRAM] Erro ao enviar mensagem: {e}")
     return None
@@ -97,7 +83,6 @@ def buscar_estatisticas_partida(fixture_id):
     return []
 
 def extrair_estatisticas(fixture_id):
-    """Extração clássica, robusta e blindada com mapeamento ampliado para evitar falsos zeros"""
     stats = {
         "posse_casa": "50%", "posse_fora": "50%",
         "chutes_totais_casa": 0, "chutes_totais_fora": 0,
@@ -151,17 +136,12 @@ def extrair_estatisticas(fixture_id):
                 elif "corner kicks" in stype:
                     stats[f"cantos_{sufixo}"] = val_limpo
                     stats["dados_validos"] = True
-                    
     except Exception as e:
-        print(f"[EXCEÇÃO ESTATÍSTICAS] Erro ao processar estatísticas do jogo {fixture_id}: {e}")
+        print(f"[EXCEÇÃO ESTATÍSTICAS] {e}")
         
     return stats
 
 def extrair_estatisticas_avancadas(fixture_id):
-    """
-    Função modular auxiliar corrigida para capturar métricas preditivas 
-    (xG, chutes bloqueados e defesas) independentemente da variação de string da API.
-    """
     stats_avancadas = {
         "xg_casa": 0.0, "xg_fora": 0.0,
         "chutes_bloqueados_casa": 0, "chutes_bloqueados_fora": 0,
@@ -200,7 +180,6 @@ def extrair_estatisticas_avancadas(fixture_id):
     return stats_avancadas
 
 def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
-    """Gera um mini histograma visual moderno com blocos baseado na evolução da pressão"""
     global HISTORICO_MOMENTUM
     if fixture_id not in HISTORICO_MOMENTUM:
         HISTORICO_MOMENTUM[fixture_id] = [3, 5, 4, 7]
@@ -226,29 +205,23 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         f"Estatísticas - Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
         f"Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']} | "
         f"Chutes Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']} | "
-        f"Chutes Fora: {estats['chutes_fora_casa']} x {estats['chutes_fora_fora']} | "
         f"Dentro da Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']} | "
-        f"Ataques Perigosos: {estats['ataques_perigosos_casa']} x {estats['ataques_perigosos_fora']} | "
         f"Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']} | "
-        f"xG Estimado: {estats_avancadas['xg_casa']} x {estats_avancadas['xg_fora']} | "
-        f"Chutes Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']} | "
-        f"Defesas de Goleiro: {estats_avancadas['defesas_goleiro_casa']} x {estats_avancadas['defesas_goleiro_fora']}"
+        f"xG: {estats_avancadas['xg_casa']} x {estats_avancadas['xg_fora']} | "
+        f"Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']}"
     )
 
-    # PROMPT ULTRA-ROBUSTO E ANTI-CLICHÊ PARA TRADING ESPORTIVO LIVE (COM SUPORTE A MÉTRICAS PREDITIVAS)
     prompt = (
-        f"Você é um Head Trader quantitativo e analista de desempenho sênior, implacável e analítico, especializado em modelagem preditiva para o mercado de {tipo.upper()} ao vivo. "
-        f"Sua função é realizar uma autópsia tática crua e direta dos números atuais (incluindo métricas de expectativa de gol e bloqueios defensivos), ignorando completamente clichês ou frases feitas.\n\n"
-        f"Contexto Crítico da Partida:\n"
+        f"Você é um Head Trader quantitativo e analista de desempenho sênior, especializado em modelagem preditiva para o mercado de {tipo.upper()} ao vivo. "
+        f"Faça uma análise crua e direta dos números atuais:\n\n"
         f"- Competição: {liga}\n"
-        f"- Placar Atual: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-        f"- Janela Temporal: {minuto}' do {periodo_etapa}\n"
-        f"- Métrica Estatística Bruta e Preditiva:\n{resumo_stats}\n\n"
-        f"Diretrizes Rígidas de Escrita e Análise:\n"
-        f"1. Na PRIMEIRA linha, forneça obrigatoriamente e exclusivamente um número inteiro de 1 a 10 representando o seu Índice de Convicção Técnica para esta entrada (exemplo: '9').\n"
-        f"2. Escreva exatamente 2 ou 3 tópicos analíticos curtos, incisivos e profundos, iniciados por '•'.\n"
-        f"3. Cada tópico DEVE cruzar variáveis (ex: correlacionar o volume de xG e chutes bloqueados com a iminência de quebra do bolsão defensivo).\n"
-        f"4. Proibido usar termos vagos como 'jogo movimentado', 'pressão forte' ou 'procurar o gol'. Seja cirúrgico, técnico e aponte o comportamento tático exato que justifica a oportunidade neste minuto exato."
+        f"- Placar: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
+        f"- Minuto: {minuto}' do {periodo_etapa}\n"
+        f"- Dados: {resumo_stats}\n\n"
+        f"Diretrizes:\n"
+        f"1. Na PRIMEIRA linha, forneça obrigatoriamente um número inteiro de 1 a 10 de convicção (exemplo: '9').\n"
+        f"2. Escreva exatamente 2 ou 3 tópicos curtos e profundos iniciados por '•'.\n"
+        f"3. Seja cirúrgico, técnico e evite clichês."
     )
     
     try:
@@ -272,21 +245,14 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         
         analise_linhas = "\n".join(linhas[indice_inicio_texto:])
         if not analise_linhas:
-            analise_linhas = (
-                f"• A intensidade do confronto e a densidade de finalizações (Total: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']}) evidenciam forte desequilíbrio no setor defensivo.\n"
-                f"• O volume de ocupação territorial aos {minuto}' eleva consideravelmente a probabilidade estatística de conversão."
-            )
+            analise_linhas = f"• O padrão de finalizações mantém forte pressão no último terço.\n• Os indicadores quantitativos aos {minuto}' sustentam a tendência."
         return nota_num, analise_linhas
     except Exception as e:
-        print(f"[EXCEÇÃO IA] Erro detalhado ao gerar análise com Gemini: {e}")
-        return 8, (
-            f"• O padrão de finalizações entre {time_casa} e {time_fora} mantém alta pressão no último terço.\n"
-            f"• Os indicadores quantitativos aos {minuto}' sustentam a tendência projetada para o mercado."
-        )
+        return 8, f"• O volume ofensivo mantém alta pressão territorial.\n• Os indicadores aos {minuto}' sustentam a tendência projetada."
 
 def processar_partidas():
     hora_atual = datetime.now().strftime('%H:%M:%S')
-    print(f"\n[{hora_atual}] Varredura completa em tempo real (Gols e Escanteios em todo o jogo)...")
+    print(f"\n[{hora_atual}] Varredura completa em tempo real...")
     jogos = buscar_jogos_ao_vivo()
     
     if not jogos:
@@ -296,62 +262,40 @@ def processar_partidas():
     tempo_atual = time.time()
     CACHE_ALERTAS_ENVIADOS = {fid: ts for fid, ts in CACHE_ALERTAS_ENVIADOS.items() if tempo_atual - ts < 1200}
 
-    # --- VERIFICAÇÃO DE FEEDBACKS ---
+    # Verificação de feedbacks
     jogos_para_remover = []
     for fixture_id, dados_fb in MONITORAMENTO_FEEDBACK.items():
         jogo_encontrado = next((j for j in jogos if j['fixture']['id'] == fixture_id), None)
-        
         if jogo_encontrado:
             g_c = jogo_encontrado['goals']['home'] or 0
             g_f = jogo_encontrado['goals']['away'] or 0
             total_gols_agora = g_c + g_f
             minuto_agora = jogo_encontrado['fixture']['status']['elapsed'] or 0
             msg_id_origem = dados_fb.get('msg_id')
-            
             estats_atuais = extrair_estatisticas(fixture_id)
             total_cantos_agora = estats_atuais['cantos_casa'] + estats_atuais['cantos_fora']
 
             if dados_fb['tipo'] == 'gols':
                 if total_gols_agora > dados_fb['gols_no_alerta']:
                     minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
-                    msg_feedback = (
-                        f"✅ **GREEN / GOL CONFIRMADO!** ✅\n\n"
-                        f"⚽ Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n"
-                        f"⏱️ Gol aos {minuto_agora}' (Alerta aos {dados_fb['minuto_alerta']}')\n"
-                        f"⏳ Janela de reação: {minutos_para_agir} minuto(s)"
-                    )
-                    enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
+                    enviar_alerta_telegram(f"✅ **GREEN / GOL CONFIRMADO!** ✅\n\n⚽ Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n⏱️ Gol aos {minuto_agora}' (Alerta aos {dados_fb['minuto_alerta']}')\n⏳ Reação: {minutos_para_agir} min", reply_to_id=msg_id_origem)
                     jogos_para_remover.append(fixture_id)
                 elif (minuto_agora - dados_fb['minuto_alerta']) > 15:
                     jogos_para_remover.append(fixture_id)
-                    
             elif dados_fb['tipo'] == 'escanteios':
                 meta_cantos = dados_fb['meta_cantos']
                 if total_cantos_agora >= meta_cantos:
                     minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
-                    msg_feedback = (
-                        f"✅ **ESCANTEIOS BATERAM!** 🎯\n\n"
-                        f"🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n"
-                        f"⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_agora} escanteios (Meta: > {meta_cantos - 0.5})\n"
-                        f"⏳ Janela de reação: {minutos_para_agir} minuto(s)"
-                    )
-                    enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
+                    enviar_alerta_telegram(f"✅ **ESCANTEIOS BATERAM!** 🎯\n\n🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_agora} cantos\n⏳ Reação: {minutos_para_agir} min", reply_to_id=msg_id_origem)
                     jogos_para_remover.append(fixture_id)
                 elif minuto_agora >= 89 or (minuto_agora - dados_fb['minuto_alerta']) > 15:
-                    minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
-                    msg_feedback = (
-                        f"🔴 **ESCANTEIOS NÃO BATERAM**\n\n"
-                        f"🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n"
-                        f"⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_agora} escanteios (Meta: > {meta_cantos - 0.5})"
-                    )
-                    enviar_alerta_telegram(msg_feedback, reply_to_id=msg_id_origem)
+                    enviar_alerta_telegram(f"🔴 **ESCANTEIOS NÃO BATERAM**\n\n🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_agora} cantos", reply_to_id=msg_id_origem)
                     jogos_para_remover.append(fixture_id)
         else:
             jogos_para_remover.append(fixture_id)
             
     for fid in jogos_para_remover:
         MONITORAMENTO_FEEDBACK.pop(fid, None)
-    # ---------------------------------------------
 
     alertas_enviados_ciclo = 0
     for jogo in jogos:
@@ -386,9 +330,6 @@ def processar_partidas():
         if fixture_id in CACHE_ALERTAS_ENVIADOS:
             continue
 
-        # =========================================================================
-        # GATILHOS AMPLIADOS PARA GOLS (1º Tempo: 15'-25' e 35'-45'+ / 2º Tempo: 55'-65' e 75'-89')
-        # =========================================================================
         gols_1t_inicio = (status_short == '1H' and 15 <= minuto <= 25)
         gols_1t_fim   = (status_short == '1H' and 35 <= minuto <= 45)
         gols_2t_inicio = (status_short == '2H' and 55 <= minuto <= 65)
@@ -407,20 +348,26 @@ def processar_partidas():
             )
             grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
 
+            # CONSTRUÇÃO INTELIGENTE DO BLOCO DE ESTATÍSTICAS AVANÇADAS (Só exibe xG se for maior que 0.0)
+            bloco_avancado_str = ""
+            if estats_avancadas['xg_casa'] > 0.0 or estats_avancadas['xg_fora'] > 0.0:
+                bloco_avancado_str += f"• xG (Expectativa de Gol): {estats_avancadas['xg_casa']} x {estats_avancadas['xg_fora']}\n"
+            if estats_avancadas['chutes_bloqueados_casa'] > 0 or estats_avancadas['chutes_bloqueados_fora'] > 0:
+                bloco_avancado_str += f"• Chutes Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']}\n"
+
             mensagem = (
                 f"🚨 **TENDÊNCIA PARA GOL ({periodo_etapa})** 🚨\n\n"
                 f"🏆 Liga: {liga}\n"
                 f"⚽ Partida: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
                 f"⏱️ Alerta aos {minuto}' ({periodo_etapa}) • Placar {gols_casa}-{gols_fora}\n\n"
-                f"📊 **Estatísticas Reais e Preditivas:**\n"
+                f"📊 **Estatísticas Reais:**\n"
                 f"• Posse: {estats['posse_casa']} x {estats['posse_fora']}\n"
                 f"• Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']}\n"
                 f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
                 f"• Chutes para Fora: {estats['chutes_fora_casa']} x {estats['chutes_fora_fora']}\n"
                 f"• Chutes Dentro da Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']}\n"
                 f"• Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}\n"
-                f"• xG (Expectativa de Gol): {estats_avancadas['xg_casa']} x {estats_avancadas['xg_fora']}\n"
-                f"• Chutes Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']}\n\n"
+                f"{bloco_avancado_str}"
                 f"📈 **Gráfico de Momentum:**\n"
                 f"{grafico_visual}\n\n"
                 f"🎯 Mercado Sugerido: Mais de {total_gols_atual + 0.5} Gols ({periodo_etapa})\n"
@@ -444,9 +391,6 @@ def processar_partidas():
                 alertas_enviados_ciclo += 1
                 continue
 
-        # =========================================================================
-        # GATILHOS AMPLIADOS PARA ESCANTEIOS (1º Tempo: 28'-38' | 2º Tempo: 65'-85')
-        # =========================================================================
         cantos_1t = (status_short == '1H' and 28 <= minuto <= 38)
         cantos_2t = (status_short == '2H' and 65 <= minuto <= 85)
 
@@ -473,8 +417,7 @@ def processar_partidas():
                 f"• Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}\n"
                 f"• Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']}\n"
                 f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
-                f"• Posse de Bola: {estats['posse_casa']} x {estats['posse_fora']}\n"
-                f"• Defesas de Goleiro / Cantos gerados: {estats_avancadas['defesas_goleiro_casa']} x {estats_avancadas['defesas_goleiro_fora']}\n\n"
+                f"• Posse de Bola: {estats['posse_casa']} x {estats['posse_fora']}\n\n"
                 f"📈 **Gráfico de Momentum:**\n"
                 f"{grafico_visual}\n\n"
                 f"🎯 Mercado Sugerido: Mais de {total_cantos_atual + 1.5} Escanteios (Live)\n"
@@ -500,8 +443,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô calibrado para varredura completa com métricas preditivas avançadas iniciado!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com módulos preditivos blindados de xG, bloqueios e defesas para o Telegram!*")
+    print("🤖 Robô calibrado com ocultação inteligente de xG zerado iniciado!")
+    enviar_alerta_telegram("🚀 *Robô atualizado: xG ocultado automaticamente quando a API não fornecer o dado!*")
     
     while True:
         try:
