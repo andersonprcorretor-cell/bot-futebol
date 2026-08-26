@@ -106,13 +106,17 @@ def extrair_estatisticas(fixture_id):
     }
     
     stats_lista = buscar_estatisticas_partida(fixture_id)
+    print(f"[DEBUG STATS] Fixture {fixture_id}: Total de blocos de stats retornados = {len(stats_lista)}")
+    
     if not stats_lista or len(stats_lista) < 2:
+        print(f"[DEBUG STATS] Fixture {fixture_id}: Dados insuficientes ou vazios na API.")
         return stats
 
     try:
         for idx, time_data in enumerate(stats_lista[:2]):
             sufixo = "casa" if idx == 0 else "fora"
             estatisticas_time = time_data.get('statistics', [])
+            print(f"[DEBUG STATS] Fixture {fixture_id} ({sufixo}): {len(estatisticas_time)} métricas encontradas.")
             
             for s in estatisticas_time:
                 stype = str(s.get('type', '')).strip().lower()
@@ -150,6 +154,7 @@ def extrair_estatisticas(fixture_id):
     except Exception as e:
         print(f"[EXCEÇÃO ESTATÍSTICAS] {e}")
         
+    print(f"[DEBUG STATS] Fixture {fixture_id} processada. dados_validos = {stats['dados_validos']} | Cantos: {stats['cantos_casa']}x{stats['cantos_fora']} | Chutes: {stats['chutes_totais_casa']}x{stats['chutes_totais_fora']}")
     return stats
 
 def extrair_estatisticas_avancadas(fixture_id):
@@ -528,8 +533,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô atualizado com minutagem otimizada (a partir de 10' e 55') e Gemini 2.0 Flash!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com sucesso e operando com Gemini 2.0 Flash!*")
+    print("🤖 Robô atualizado com minutagem otimizada (a partir de 10' e 55'), Gemini 2.0 Flash e Debug de Stats!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com logs de depuração estatística ativados!*")
     
     while True:
         try:
