@@ -368,15 +368,21 @@ def processar_partidas():
         status_short = jogo['fixture']['status']['short']
         
         if fixture_id not in CONTROLE_GOLS:
-            CONTROLE_GOLS[fixture_id] = {'total_gols': total_gols_atual, 'minuto_ultimo_gol': -99}
+            # Se entrou agora no radar, gravamos o minuto atual como último gol para evitar falso gatilho imediato
+            CONTROLE_GOLS[fixture_id] = {'total_gols': total_gols_atual, 'minuto_ultimo_gol': minuto}
             
         estado_jogo = CONTROLE_GOLS[fixture_id]
+        
+        # Se o total de gols aumentou desde a última checagem
         if total_gols_atual > estado_jogo['total_gols']:
             CONTROLE_GOLS[fixture_id]['total_gols'] = total_gols_atual
             CONTROLE_GOLS[fixture_id]['minuto_ultimo_gol'] = minuto
             continue
         
+        # Garante atualização caso tenha mudado sem disparar (ex: sincronia)
         CONTROLE_GOLS[fixture_id]['total_gols'] = total_gols_atual
+        
+        # CORREÇÃO PRINCIPAL: Impede alerta se o gol acabou de ocorrer (menos de 3 minutos de diferença)
         if (minuto - estado_jogo['minuto_ultimo_gol']) < 3:
             continue
             
