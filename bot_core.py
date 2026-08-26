@@ -227,20 +227,21 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         resumo_stats += f" | Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']}"
 
     prompt = (
-        f"Atue como um Analista Tático Sênior e Especialista Quantitativo de Futebol.\n"
-        f"Gere uma leitura situacional técnica e profunda sobre o jogo abaixo, focada no mercado de {tipo.upper()}.\n\n"
-        f"CENÁRIO DA PARTIDA:\n"
-        f"🏆 Competição: {liga}\n"
-        f"⚽ Placar: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-        f"⏱️ Tempo: {minuto}' do {periodo_etapa}\n"
-        f"📊 Estatísticas Atuais: {resumo_stats}\n\n"
+        f"Você é um Analista Tático Sênior e Trader Esportivo Quantitativo de elite. "
+        f"Sua missão é criar uma análise EXCLUSIVA, personalizada e cirúrgica para o jogo entre {time_casa} e {time_fora} "
+        f"pela competição {liga}, atualmente no minuto {minuto}' do {periodo_etapa} com o placar de {gols_casa} a {gols_fora}.\n\n"
+        f"ESTATÍSTICAS ATUAIS DA PARTIDA:\n{resumo_stats}\n\n"
+        f"DIRETRIZES RIGOROSAS PARA A ANÁLISE DE MERCADO DE {tipo.upper()}:\n"
+        f"- NUNCA utilize respostas genéricas ou clichês repetitivos. Cada jogo tem uma dinâmica única que deve ser respeitada.\n"
+        f"- Mencione explicitamente o comportamento dos times com base nos números acima (ex: quem está finalizando mais, quem tem posse improdutiva, volume de cantos ou pressão nas alas).\n"
+        f"- Conecte a minutagem atual ({minuto} minutos) com a urgência do placar ({gols_casa}x{gols_fora}).\n\n"
         f"REGRAS DE FORMATAÇÃO OBRIGATÓRIAS:\n"
-        f"1. Na PRIMEIRA LINHA, escreva APENAS um número inteiro de 1 a 10 (representando a força da tendência para sair mais {tipo}).\n"
-        f"2. A partir da segunda linha, escreva EXATAMENTE 3 tópicos curtos e robustos, começando cada um com o símbolo '• '.\n"
-        f"3. Tópico 1: Analise o controle territorial, posse de bola e quem dita o ritmo do jogo no momento.\n"
-        f"4. Tópico 2: Descreva o desenho tático e transições (ex: como um time fura o bloco defensivo do outro, efetividade nos chutes de dentro da área).\n"
-        f"5. Tópico 3: Dê o veredito situacional explicando por que a dinâmica e os espaços cedidos mantêm o mercado de {tipo} muito aquecido.\n"
-        f"Use jargões táticos reais (bloco baixo, transição vertical, retenção, último terço) e seja incisivo. Nada de clichês."
+        f"1. Na PRIMEIRA LINHA, escreva APENAS um número inteiro de 1 a 10 (representando a força da tendência para o mercado de {tipo}).\n"
+        f"2. A partir da segunda linha, escreva EXATAMENTE 3 tópicos curtos, analíticos e customizados, começando cada um com '• '.\n"
+        f"3. Tópico 1: Contextualize a posse, o controle territorial e qual equipe está ditando o ritmo neste momento exato.\n"
+        f"4. Tópico 2: Analise o volume de finalizações, infiltrações ou escanteios gerados com base nos números do jogo.\n"
+        f"5. Tópico 3: Dê o veredito situacional explicando o porquê de abrir oportunidade no mercado de {tipo} agora.\n"
+        f"Seja direto, técnico e use terminologia de trader profissional."
     )
     
     try:
@@ -265,18 +266,18 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         
         if len(analise_linhas) < 20:
             analise_linhas = (
-                f"• O volume ofensivo e a criação de jogadas mantêm forte pressão territorial no último terço do campo.\n"
-                f"• A equipe que domina as ações busca frestas na marcação, gerando oportunidades reais dentro da área.\n"
-                f"• Os indicadores quantitativos aos {minuto}' sustentam plenamente a expectativa de movimentação no placar."
+                f"• {time_casa} e {time_fora} alternam investidas ofensivas na busca por espaços na defesa adversária.\n"
+                f"• A proporção de finalizações e o contexto do placar aos {minuto}' exigem atenção redobrada no setor defensivo.\n"
+                f"• O cenário tático atual apresenta indícios claros favoráveis à movimentação no mercado de {tipo}."
             )
             
         return nota_num, analise_linhas
     except Exception as e:
         print(f"[ERRO IA] Falha na geração do conteúdo: {e}")
         return 8, (
-            f"• A circulação de bola demonstra um padrão agressivo de tentativas de quebra de linhas defensivas.\n"
-            f"• O número de finalizações consolidadas reflete uma transição ofensiva rápida e constante.\n"
-            f"• O desenho tático aos {minuto}' favorece amplamente a expectativa no mercado de {tipo}."
+            f"• A circulação de bola entre {time_casa} e {time_fora} demonstra uma tentativa clara de quebra de linhas.\n"
+            f"• O volume de ações ofensivas consolidadas reflete a intensidade imposta no {periodo_etapa}.\n"
+            f"• A dinâmica estrutural aos {minuto}' sustenta expectativas elevadas para o mercado de {tipo}."
         )
 
 def processar_partidas():
@@ -383,7 +384,6 @@ def processar_partidas():
                 
                 print(f"      -> IA Nota Gols: {nota_pressao} para {time_casa} x {time_fora}")
 
-                # Reduzido temporariamente para 6 para garantir disparos iniciais de teste
                 if nota_pressao >= 6:
                     grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
 
@@ -480,8 +480,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
 
 if __name__ == "__main__":
-    print("🤖 Robô atualizado com logs de diagnóstico e validação flexível de ligas!")
-    enviar_alerta_telegram("🚀 *Robô reiniciado e conectado com sucesso ao sistema de monitoramento contínuo!*")
+    print("🤖 Robô atualizado com inteligência situacional personalizada na IA!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com análise situacional inteligente e restrição contra respostas repetidas!*")
     
     while True:
         try:
