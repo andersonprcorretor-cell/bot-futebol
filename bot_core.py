@@ -164,7 +164,7 @@ def extrair_estatisticas(fixture_id):
                     stats[f"chutes_alvo_{sufixo}"] = val_limpo
                 elif "shots off goal" in stype or "shots off target" in stype:
                     stats[f"chutes_fora_{sufixo}"] = val_limpo
-                elif "shots inside the box" in stype:
+                elif "shots inside the box" in stype or "shots insidebox" in stype:
                     stats[f"chutes_dentro_area_{sufixo}"] = val_limpo
                 elif "blocked shots" in stype:
                     stats[f"chutes_bloqueados_{sufixo}"] = val_limpo
@@ -356,9 +356,15 @@ def processar_partidas():
             msg_id = dados["msg_id"]
             tc = dados["time_casa"]
             tf = dados["time_fora"]
+            minuto_alerta = dados.get("minuto_alerta", 0)
             
             if gols_atuais_partida > gols_inicial:
-                msg_green = f"✅ **GREEN!** Gol saiu após o alerta! ({tc} {gc}x{gf} {tf})"
+                tempo_acao = min_atual - minuto_alerta if min_atual >= minuto_alerta else 0
+                msg_green = (
+                    f"✅ **GREEN!** Gol saiu após o alerta!\n"
+                    f"⏱️ Tempo para agir: {tempo_acao} minutos (Alerta aos {minuto_alerta}' | Gol aos {min_atual}')\n"
+                    f"⚽ Placar atualizado: {tc} {gc}x{gf} {tf}"
+                )
                 enviar_alerta_telegram(msg_green, reply_to_id=msg_id)
                 chaves_para_remover.append(chave_alerta)
             elif periodo == "1T" and (st_short == 'HT' or st_short == '2H' or min_atual >= 45):
@@ -499,7 +505,8 @@ def processar_partidas():
                         "periodo": periodo_etapa,
                         "time_casa": time_casa,
                         "time_fora": time_fora,
-                        "fixture_id": fixture_id
+                        "fixture_id": fixture_id,
+                        "minuto_alerta": minuto
                     }
 
     print(f"[{hora_atual}] Varredura finalizada.")
