@@ -214,7 +214,11 @@ def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
 
 def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, vermelhos_casa, vermelhos_fora):
     if not client_ai:
-        return 7, f"• **Dinâmica e Pressão:** O volume ofensivo apresentado por {time_casa} e {time_fora} demonstra clara pressão territorial.\n• **Indicadores Estatísticos:** Os números sustentam a expectativa de movimentação no placar.\n• **Leitura de Contexto:** A dinâmica do jogo exige monitoramento constante das finalizações."
+        return 7, (
+            f"• **Pressão Territorial:** {time_casa} e {time_fora} mantêm o ritmo acelerado no terço final.\n"
+            f"• **Indicador de Chutes:** O volume de finalizações cria uma janela propícia para alteração no placar.\n"
+            f"• **Contexto de Jogo:** O cenário aos {minuto}' do {periodo_etapa} sustenta a expectativa de gols."
+        )
     
     resumo_stats = (
         f"Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
@@ -231,12 +235,14 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         aviso_cartoes = f"\n⚠️ ATENÇÃO: Há expulsões ativas! Vermelhos para {time_casa}: {vermelhos_casa} | Vermelhos para {time_fora}: {vermelhos_fora}."
 
     prompt = (
-        f"Você é um Analista Tático Sênior e Trader Esportivo Quantitativo de elite. "
-        f"Crie uma análise EXCLUSIVA, profunda e altamente técnica para {time_casa} e {time_fora} ({liga}) aos {minuto}' do {periodo_etapa} ({gols_casa}x{gols_fora}).\n"
-        f"{aviso_cartoes}\n\nESTATÍSTICAS REAIS:\n{resumo_stats}\n\n"
-        f"REGRAS ESTRITAS:\n"
-        f"1. Na PRIMEIRA LINHA, escreva APENAS um número inteiro de 1 a 10 representando a nota de valor/pressão.\n"
-        f"2. A partir da segunda linha, escreva EXATAMENTE 3 tópicos no formato: '• **[Título Tático Criativo e Descritivo]:** [Análise aprofundada cruzando finalizações, conversão, zoneamento de chutes, comportamento de cantos e o contexto do placar/game state].'"
+        f"Você é um Trader Esportivo Quantitativo de elite e Analista Tático Sênior de Futebol.\n"
+        f"Escreva uma análise PROFUNDA, ESPECÍFICA e TÉCNICA para a partida entre {time_casa} e {time_fora} ({liga}) aos {minuto}' do {periodo_etapa}, com placar atual de {gols_casa}x{gols_fora}.\n"
+        f"{aviso_cartoes}\n\n"
+        f"ESTATÍSTICAS DA PARTIDA:\n{resumo_stats}\n\n"
+        f"INSTRUÇÕES OBRIGATÓRIAS:\n"
+        f"1. Na PRIMEIRA LINHA, retorne APENAS um número inteiro de 1 a 10 representando a nota de pressão/oportunidade.\n"
+        f"2. A partir da segunda linha, escreva EXATAMENTE 3 tópicos detalhados no formato exato: '• **[Título Tático Único e Descritivo]:** [Análise aprofundada citando números reais da partida, conversão de chutes, pressão territorial, impacto das expulsões se houver, e a leitura exata do game state para o mercado de gols].'\n"
+        f"3. NUNCA utilize frases genéricas ou padrões repetitivos. Cada tópico deve ser rico em detalhes táticos baseados estritamente nos dados fornecidos."
     )
     
     try:
@@ -258,19 +264,16 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         nota_num = max(1, min(10, nota_num))
         analise_linhas = "\n".join(linhas[indice_inicio_texto:]).strip()
         
-        if len(analise_linhas) < 10:
-            analise_linhas = (
-                f"• **Dinâmica de Transição e Volume:** {time_casa} e {time_fora} alternam investidas explorando brechas defensivas.\n"
-                f"• **Eficiência de Finalização:** A proporção de chutes exigirá maior solidez na marcação baixa.\n"
-                f"• **Matriz de Expectativa:** O cenário tático atual sustenta o padrão de movimentação no placar."
-            )
+        if len(analise_linhas) < 15:
+            raise ValueError("Resposta muito curta da IA")
             
         return nota_num, analise_linhas
     except Exception as e:
+        print(f"[ERRO GEMINI] {e}")
         return 7, (
-            f"• **Intensidade no Terço Final:** A circulação de bola demonstra alta incidência de pressão territorial.\n"
-            f"• **Volume Consolidado:** As finalizações refletem o ritmo imposto neste momento da etapa.\n"
-            f"• **Leitura de Contexto:** A estrutura da partida mantém parâmetros favoráveis ao modelo."
+            f"• **Pressão Territorial e Transição:** {time_casa} imprime forte ritmo ofensivo com {estats['chutes_totais_casa']} finalizações contra {estats['chutes_totais_fora']} do {time_fora}.\n"
+            f"• **Volume de Finalizações no Alvo:** A proporção de {estats['chutes_alvo_casa']} chutes certos evidencia oportunidades claras no terço final.\n"
+            f"• **Leitura de Game State:** O cenário aos {minuto}' do {periodo_etapa} com placar em {gols_casa}x{gols_fora} mantém parâmetros elevados para o mercado de gols."
         )
 
 def gerar_analise_intervalo(liga, time_casa, time_fora, gols_casa, gols_fora, estats, vermelhos_casa, vermelhos_fora):
@@ -291,7 +294,7 @@ def gerar_analise_intervalo(liga, time_casa, time_fora, gols_casa, gols_fora, es
         f"Você é um Trader Esportivo Quantitativo especialista em análises de intervalo (HT). "
         f"Com base nas estatísticas COMPLETAS do 1º tempo de {time_casa} vs {time_fora} ({liga}), com placar parcial de {gols_casa}x{gols_fora}:\n"
         f"{resumo_stats}\n{aviso_cartoes}\n\n"
-        f"Escreva exatamente 3 tópicos começando com '• **[Título]:** ' projetando cenários, tendências e sugestões de entradas inteligentes para o 2º tempo."
+        f"Escreva exatamente 3 tópicos começando com '• **[Título]:** ' projetando cenários, tendências e sugestões de entradas inteligentes para o 2º tempo, utilizando os dados numéricos do 1T."
     )
     try:
         response = client_ai.models.generate_content(
@@ -300,10 +303,11 @@ def gerar_analise_intervalo(liga, time_casa, time_fora, gols_casa, gols_fora, es
         )
         return response.text.strip()
     except Exception as e:
+        print(f"[ERRO GEMINI HT] {e}")
         return (
-            f"• **Ritmo Ofensivo Acumulado:** O volume no 1T indica tendência de continuidade nas investidas.\n"
-            f"• **Ajustes Estruturais:** Modificações no intervalo podem abrir espaços na defesa adversária.\n"
-            f"• **Janela de Oportunidades:** Monitorar os primeiros 15 minutos do 2T em busca de valor em gols ou cantos."
+            f"• **Volume Ofensivo do 1T:** {time_casa} registrou {estats['chutes_totais_casa']} chutes enquanto o {time_fora} somou {estats['chutes_totais_fora']}.\n"
+            f"• **Controle Territorial:** A posse de bola ({estats['posse_casa']} x {estats['posse_fora']}) aponta tendência de ajustes táticos no intervalo.\n"
+            f"• **Expectativa para o 2T:** Monitorar os primeiros 15 minutos da etapa final buscando valor em gols ou cantos."
         )
 
 def processar_partidas():
@@ -438,8 +442,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada.")
 
 if __name__ == "__main__":
-    print("🤖 Robô iniciado com suporte a Análise de Intervalo (HT) e Padrão Sênior!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com Relatório Estatístico de Intervalo (HT) e Análise Avançada Restabelecida!*")
+    print("🤖 Robô iniciado com Análise Inteligente Avançada e Força de Dados!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com Análise Avançada e Conexão Reforçada com a IA!*")
     
     while True:
         try:
