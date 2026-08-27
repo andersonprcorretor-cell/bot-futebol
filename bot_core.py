@@ -75,6 +75,7 @@ def buscar_estatisticas_partida(fixture_id):
     params = {"fixture": int(fixture_id)}
     try:
         response = requests.get(url, headers=HEADERS_API, params=params, timeout=10)
+        print(f"[DEBUG API STATS] Fixture {fixture_id} | Status: {response.status_code} | Resposta: {response.text}")
         if response.status_code == 200:
             return response.json().get('response', [])
     except Exception as e:
@@ -183,23 +184,6 @@ def probabilidade_acumulada_poisson_maior(lmbda, k_atual):
     for i in range(0, 6):
         prob_acumulada += calcular_probabilidade_poisson(lmbda, i)
     return max(0.0, min(1.0, 1.0 - prob_acumulada))
-
-def projetar_escanteios_avancados(total_cantos_atuais, minuto, status_short):
-    if minuto <= 0:
-        return 0, 0.0, False
-        
-    minutos_totais = 45.0 if status_short == '1H' else 90.0
-    minutos_restantes = max(5.0, minutos_totais - minuto)
-    
-    taxa_por_minuto = (total_cantos_atuais / float(minuto)) if total_cantos_atuais > 0 else 0.05
-    lambda_restante = taxa_por_minuto * minutos_restantes
-    cantos_projetados_total = total_cantos_atuais + lambda_restante
-    
-    linha_sugerida = math.floor(total_cantos_atuais + 2.0) + 0.5
-    eventos_necessarios_para_bater = max(1, int(math.ceil(linha_sugerida - total_cantos_atuais)))
-    probabilidade_sucesso = probabilidade_acumulada_poisson_maior(lambda_restante, eventos_necessarios_para_bater - 1)
-    
-    return round(cantos_projetados_total, 1), linha_sugerida, probabilidade_sucesso
 
 def projetar_gols_avancados(total_gols_atuais, minuto, status_short):
     if minuto <= 0:
@@ -332,6 +316,7 @@ def processar_partidas():
         chave_gols = f"{fixture_id}_gols"
         if (rolando_1t or rolando_2t) and chave_gols not in CACHE_ALERTAS_ENVIADOS:
             periodo_etapa = "1T" if status_short == '1H' else "2T"
+            
             estats = extrair_estatisticas(fixture_id)
             estats_avancadas = extrair_estatisticas_avancadas(fixture_id)
             _, prob_gols = projetar_gols_avancados(total_gols_atual, minuto, status_short)
