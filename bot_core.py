@@ -184,32 +184,26 @@ def extrair_estatisticas_avancadas(fixture_id):
         
     return stats_avancadas
 
-def calcular_probabilidade_poisson(lmbda, k):
-    try:
-        return (math.exp(-lmbda) * (lmbda ** k)) / math.factorial(k)
-    except:
-        return 0.0
-
-def probabilidade_acumulada_poisson_maior(lmbda, k_atual):
-    prob_acumulada = 0.0
-    for i in range(0, 6):
-        prob_acumulada += calcular_probabilidade_poisson(lmbda, i)
-    return max(0.0, min(1.0, 1.0 - prob_acumulada))
-
 def projetar_gols_avancados(total_gols_atuais, minuto, status_short):
     if minuto <= 0:
-        return 0.0, False
+        return 0.5, 0.40
         
     minutos_totais = 45.0 if status_short == '1H' else 90.0
     minutos_restantes = max(5.0, minutos_totais - minuto)
     
-    taxa_por_minuto = (max(0.5, total_gols_atuais) / float(minuto)) if total_gols_atuais > 0 else 0.03
+    # CORREÇÃO POISSON: Garante um piso mínimo para jogos 0x0 ou com poucas estatísticas iniciais
+    if total_gols_atuais == 0:
+        taxa_por_minuto = max(0.025, minuto / 1800.0)
+    else:
+        taxa_por_minuto = total_gols_atuais / float(minuto)
+        
     lambda_restante = taxa_por_minuto * minutos_restantes
     
+    # Probabilidade de sair pelo menos 1 gol no restante do tempo: P(X >= 1) = 1 - P(X = 0)
+    probabilidade_sucesso = 1.0 - math.exp(-lambda_restante)
     linha_sugerida = total_gols_atuais + 0.5
-    probabilidade_sucesso = probabilidade_acumulada_poisson_maior(lambda_restante, 0)
     
-    return linha_sugerida, probabilidade_sucesso
+    return linha_sugerida, max(0.15, min(0.95, probabilidade_sucesso))
 
 def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
     global HISTORICO_MOMENTUM
@@ -333,7 +327,6 @@ def processar_partidas():
             
             estats = extrair_estatisticas(fixture_id)
             
-            # DIAGNÓSTICO: Mostra no log os valores extraídos para validação imediata
             print(f"   [DIAGNÓSTICO STATS] {time_casa} x {time_fora} | Chutes: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']} | Cantos: {estats['cantos_casa']}x{estats['cantos_fora']}")
 
             if estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0:
@@ -378,8 +371,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada.")
 
 if __name__ == "__main__":
-    print("🤖 Robô iniciado com diagnóstico de estatísticas ativado!")
-    enviar_alerta_telegram("🚀 *Robô de apostas reiniciado com diagnóstico de estatísticas ativado!*")
+    print("🤖 Robô iniciado com correção no cálculo de Poisson!")
+    enviar_alerta_telegram("🚀 *Robô de apostas reiniciado com correção no cálculo de Poisson!*")
     
     while True:
         try:
