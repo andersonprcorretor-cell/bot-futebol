@@ -21,6 +21,7 @@ HEADERS_API = {
 client_ai = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY and GEMINI_API_KEY != "SUA_GEMINI_API_KEY_AQUI" else None
 
 CACHE_ALERTAS_ENVIADOS = {}
+CACHE_HALFTIME_ENVIADOS = {}
 CONTROLE_GOLS = {}
 HISTORICO_MOMENTUM = {}
 
@@ -271,6 +272,39 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
             f"• A dinâmica estrutural aos {minuto}' sustenta expectativas para o mercado de gols."
         )
 
+def gerar_analise_intervalo(liga, time_casa, time_fora, gols_casa, gols_fora, estats, vermelhos_casa, vermelhos_fora):
+    if not client_ai:
+        return f"• O primeiro tempo encerrou com {time_casa} {gols_casa}x{gols_fora} {time_fora}.\n• Analise as estatísticas acumuladas para definir entradas no segundo tempo."
+    
+    resumo_stats = (
+        f"Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
+        f"Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']} | "
+        f"Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']} | "
+        f"Fora: {estats['chutes_fora_casa']} x {estats['chutes_fora_fora']} | "
+        f"Dentro da Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']} | "
+        f"Cantos: {estats['cantos_casa']} x {estats['cantos_fora']}"
+    )
+    aviso_cartoes = f"\n⚠️ Expulsões no 1T -> {time_casa}: {vermelhos_casa} | {time_fora}: {vermelhos_fora}" if (vermelhos_casa > 0 or vermelhos_fora > 0) else ""
+
+    prompt = (
+        f"Você é um Trader Esportivo Quantitativo especialista em análises de intervalo (HT). "
+        f"Com base nas estatísticasCOMPLETAS do 1º tempo de {time_casa} vs {time_fora} ({liga}), com placar parcial de {gols_casa}x{gols_fora}:\n"
+        f"{resumo_stats}\n{aviso_cartoes}\n\n"
+        f"Escreva exatamente 3 tópicos começando com '• ' projetando cenários, tendências e sugestões de entradas inteligentes para o 2º tempo."
+    )
+    try:
+        response = client_ai.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
+        return response.text.strip()
+    except Exception as e:
+        return (
+            f"• O volume acumulado no 1T indica tendência de continuidade no ritmo ofensivo.\n"
+            f"• Ajustes táticos no intervalo podem abrir mais espaços na defesa adversária.\n"
+            f"• Monitorar os primeiros 15 minutos do 2T em busca de oportunidades em gols ou cantos."
+        )
+
 def processar_partidas():
     hora_atual = datetime.now().strftime('%H:%M:%S')
     print(f"\n[{hora_atual}] Varredura completa em tempo real...")
@@ -280,9 +314,10 @@ def processar_partidas():
         print("[AVISO] Nenhum jogo ao vivo retornado pela API neste ciclo.")
         return
 
-    global CACHE_ALERTAS_ENVIADOS, CONTROLE_GOLS
+    global CACHE_ALERTAS_ENVIADOS, CACHE_HALFTIME_ENVIADOS, CONTROLE_GOLS
     tempo_atual = time.time()
     CACHE_ALERTAS_ENVIADOS = {fid: ts for fid, ts in CACHE_ALERTAS_ENVIADOS.items() if tempo_atual - ts < 1200}
+    CACHE_HALFTIME_ENVIADOS = {fid: ts for fid, ts in CACHE_HALFTIME_ENVIADOS.items() if tempo_atual - ts < 7200}
 
     for jogo in jogos:
         liga = jogo['league']['name']
@@ -311,7 +346,46 @@ def processar_partidas():
                 'minuto_ultimo_gol': minuto if total_gols_atual > 0 else -99
             }
             continue 
+
+        # ==========================================
+        # NOVO: PROCESSAMENTO DE INTERVALO (HT)
+        # ==========================================
+        if status_short == 'HT' and fixture_id not in CACHE_HALFTIME_ENVIADOS:
+            estats = extrair_estatisticas(fixture_id)
+            vermelhos_casa, vermelhos_fora = analisar_eventos_partida(fixture_id, home_id, away_id)
             
+            # Só envia se houver estatísticas relevantes
+            if not (estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0):
+                analise_ht = gerar_analise_intervalo(liga, time_casa, time_fora, gols_casa, gols_fora, estats, vermelhos_casa, vermelhos_fora)
+                aviso_vermelho_txt = f"\n🟥 **Cartões Vermelhos no 1T:** {time_casa} ({vermelhos_casa}) x {time_fora} ({vermelhos_fora})" if (vermelhos_casa > 0 or vermelhos_fora > 0) else ""
+
+                mensagem_ht = (
+                    f"☕ **ANÁLISE DE INTERVALO (HT)** ☕\n\n"
+                    f"🏆 Liga: {liga}\n"
+                    f"⚽ Partida: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
+                    f"⏱️ Fim do 1º Tempo (Intervalo)"
+                    f"{aviso_vermelho_txt}\n\n"
+                    f"📊 **Balanço Estatístico do 1º Tempo:**\n"
+                    f"• Posse: {estats['posse_casa']} x {estats['posse_fora']}\n"
+                    f"• Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']}\n"
+                    f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
+                    f"• Chutes Para Fora: {estats['chutes_fora_casa']} x {estats['chutes_fora_fora']}\n"
+                    f"• Dentro da Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']}\n"
+                    f"• Chutes Bloqueados: {estats['chutes_bloqueados_casa']} x {estats['chutes_bloqueados_fora']}\n"
+                    f"• Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}\n\n"
+                    f"💡 **Projeções e Sugestões para o 2º Tempo:**\n"
+                    f"{analise_ht}\n\n"
+                    f"⚠️ Planeje suas entradas com cautela para a etapa final."
+                )
+                
+                msg_id = enviar_alerta_telegram(mensagem_ht)
+                if msg_id:
+                    print(f"   [ALERTA INTERVALO ENVIADO] ☕ {time_casa} x {time_fora} (HT)")
+                    CACHE_HALFTIME_ENVIADOS[fixture_id] = tempo_atual
+
+        # ==========================================
+        # MONITORAMENTO DE JOGO ROLANDO
+        # ==========================================
         rolando_1t = (status_short == '1H' and 8 <= minuto <= 43)
         rolando_2t = (status_short == '2H' and 50 <= minuto <= 86)
 
@@ -322,19 +396,13 @@ def processar_partidas():
             estats = extrair_estatisticas(fixture_id)
             vermelhos_casa, vermelhos_fora = analisar_eventos_partida(fixture_id, home_id, away_id)
             
-            print(f"   [DIAGNÓSTICO STATS] {time_casa} x {time_fora} | Chutes: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']} | Cantos: {estats['cantos_casa']}x{estats['cantos_fora']} | Vermelhos: {vermelhos_casa}x{vermelhos_fora}")
-
             if estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0 and vermelhos_casa == 0 and vermelhos_fora == 0:
-                print(f"   [IGNORADO] {time_casa} x {time_fora} - Estatísticas e eventos zerados.")
                 continue
 
             _, prob_gols = projetar_gols_avancados(total_gols_atual, minuto, status_short, vermelhos_casa, vermelhos_fora)
-
             nota_pressao, analise_ia = gerar_analise_inteligente(
                 liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, vermelhos_casa, vermelhos_fora
             )
-            
-            print(f"   [AVALIAÇÃO] {time_casa} x {time_fora} | Nota IA: {nota_pressao} | Prob Poisson: {prob_gols:.2f}")
 
             if nota_pressao >= 6 and prob_gols >= 0.35:
                 grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
@@ -370,8 +438,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada.")
 
 if __name__ == "__main__":
-    print("🤖 Robô iniciado e rodando varreduras completas!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com estatísticas completas e cartões vermelhos!*")
+    print("🤖 Robô iniciado com suporte a Análise de Intervalo (HT)!")
+    enviar_alerta_telegram("🚀 *Robô atualizado com Relatório Estatístico de Intervalo (HT)!*")
     
     while True:
         try:
