@@ -34,7 +34,7 @@ LIGAS_PRINCIPAIS = [
     "brasileiro", "copa do brasil", "liga profesional", "primera division", 
     "primeira liga", "eredivisie", "championship", "super lig", "pro league", 
     "superligaen", "allsvenskan", "eliteserien", "saudi professional league", 
-    "mls", "j1 league", "k league", "liga mx", "liga 1", "primera a"
+    "mls", "j1 league", "k league", "liga mx", "liga 1", "primera a", "copa uruguay"
 ]
 
 def validar_liga_principal(nome_liga):
@@ -92,6 +92,35 @@ def buscar_estatisticas_partida(fixture_id):
     except Exception as e:
         print(f"[EXCEÇÃO STATS API] Erro ao buscar estatísticas do jogo {fixture_id}: {e}")
     return []
+
+def buscar_eventos_partida(fixture_id):
+    url = "https://v3.football.api-sports.io/fixtures/events"
+    params = {"fixture": int(fixture_id)}
+    try:
+        response = requests.get(url, headers=HEADERS_API, params=params, timeout=10)
+        if response.status_code == 200:
+            return response.json().get('response', [])
+    except Exception as e:
+        print(f"[EXCEÇÃO EVENTS API] Erro ao buscar eventos do jogo {fixture_id}: {e}")
+    return []
+
+def analisar_eventos_partida(fixture_id, home_id, away_id):
+    eventos = buscar_eventos_partida(fixture_id)
+    vermelhos_casa = 0
+    vermelhos_fora = 0
+    try:
+        for ev in eventos:
+            etype = str(ev.get('type', '')).strip().lower()
+            edetail = str(ev.get('detail', '')).strip().lower()
+            team_id = ev.get('team', {}).get('id')
+            if "card" in etype and ("red" in edetail or "yellow_red" in edetail):
+                if team_id == home_id:
+                    vermelhos_casa += 1
+                elif team_id == away_id:
+                    vermelhos_fora += 1
+    except Exception as e:
+        pass
+    return vermelhos_casa, vermelhos_fora
 
 def extrair_estatisticas(fixture_id):
     stats = {
@@ -184,22 +213,23 @@ def extrair_estatisticas_avancadas(fixture_id):
         
     return stats_avancadas
 
-def projetar_gols_avancados(total_gols_atuais, minuto, status_short):
+def projetar_gols_avancados(total_gols_atuais, minuto, status_short, vermelhos_casa=0, vermelhos_fora=0):
     if minuto <= 0:
         return 0.5, 0.40
         
     minutos_totais = 45.0 if status_short == '1H' else 90.0
     minutos_restantes = max(5.0, minutos_totais - minuto)
     
-    # CORREÇÃO POISSON: Garante um piso mínimo para jogos 0x0 ou com poucas estatísticas iniciais
     if total_gols_atuais == 0:
         taxa_por_minuto = max(0.025, minuto / 1800.0)
     else:
         taxa_por_minuto = total_gols_atuais / float(minuto)
         
+    # Ajuste dinâmico se houver cartão vermelho (aumenta o desequilíbrio e a taxa de gols)
+    if vermelhos_casa > 0 or vermelhos_fora > 0:
+        taxa_por_minuto *= 1.25
+
     lambda_restante = taxa_por_minuto * minutos_restantes
-    
-    # Probabilidade de sair pelo menos 1 gol no restante do tempo: P(X >= 1) = 1 - P(X = 0)
     probabilidade_sucesso = 1.0 - math.exp(-lambda_restante)
     linha_sugerida = total_gols_atuais + 0.5
     
@@ -223,7 +253,7 @@ def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
         
     return f"`[{grafico_str.strip()}]` (Pressão Recente)"
 
-def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="gols"):
+def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, vermelhos_casa, vermelhos_fora, tipo="gols"):
     if not client_ai:
         return 7, f"• O volume ofensivo apresentado por {time_casa} e {time_fora} demonstra clara pressão territorial.\n• Os indicadores estatísticos sustentam a expectativa de movimentação no placar."
     
@@ -235,10 +265,15 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         f"Cantos: {estats['cantos_casa']} x {estats['cantos_fora']}"
     )
 
+    aviso_cartoes = ""
+    if vermelhos_casa > 0 or vermelhos_fora > 0:
+        aviso_cartoes = f"\n⚠️ ATENÇÃO: Há expulsões na partida! Vermelhos para {time_casa}: {vermelhos_casa} | Vermelhos para {time_fora}: {vermelhos_fora} (Desequilíbrio numérico ativo)."
+
     prompt = (
         f"Você é um Analista Tático Sênior e Trader Esportivo Quantitativo de elite. "
         f"Sua missão é criar uma análise EXCLUSIVA para o jogo entre {time_casa} e {time_fora} "
-        f"pela competição {liga}, atualmente no minuto {minuto}' do {periodo_etapa} com o placar de {gols_casa} a {gols_fora}.\n\n"
+        f"pela competição {liga}, atualmente no minuto {minuto}' do {periodo_etapa} com o placar de {gols_casa} a {gols_fora}.\n"
+        f"{aviso_cartoes}\n\n"
         f"ESTATÍSTICAS ATUAIS:\n{resumo_stats}\n\n"
         f"REGRAS DE FORMATAÇÃO OBRIGATÓRIAS:\n"
         f"1. Na PRIMEIRA LINHA, escreva APENAS um número inteiro de 1 a 10.\n"
@@ -299,6 +334,8 @@ def processar_partidas():
             continue
 
         fixture_id = jogo['fixture']['id']
+        home_id = jogo['teams']['home']['id']
+        away_id = jogo['teams']['away']['id']
         time_casa = jogo['teams']['home']['name']
         time_fora = jogo['teams']['away']['name']
         
@@ -326,18 +363,19 @@ def processar_partidas():
             periodo_etapa = "1T" if status_short == '1H' else "2T"
             
             estats = extrair_estatisticas(fixture_id)
+            vermelhos_casa, vermelhos_fora = analisar_eventos_partida(fixture_id, home_id, away_id)
             
-            print(f"   [DIAGNÓSTICO STATS] {time_casa} x {time_fora} | Chutes: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']} | Cantos: {estats['cantos_casa']}x{estats['cantos_fora']}")
+            print(f"   [DIAGNÓSTICO STATS] {time_casa} x {time_fora} | Chutes: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']} | Cantos: {estats['cantos_casa']}x{estats['cantos_fora']} | Vermelhos: {vermelhos_casa}x{vermelhos_fora}")
 
-            if estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0:
-                print(f"   [IGNORADO] {time_casa} x {time_fora} - Estatísticas vieram zeradas.")
+            if estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0 and vermelhos_casa == 0 and vermelhos_fora == 0:
+                print(f"   [IGNORADO] {time_casa} x {time_fora} - Estatísticas e eventos zerados.")
                 continue
 
             estats_avancadas = extrair_estatisticas_avancadas(fixture_id)
-            _, prob_gols = projetar_gols_avancados(total_gols_atual, minuto, status_short)
+            _, prob_gols = projetar_gols_avancados(total_gols_atual, minuto, status_short, vermelhos_casa, vermelhos_fora)
 
             nota_pressao, analise_ia = gerar_analise_inteligente(
-                liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="gols"
+                liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, vermelhos_casa, vermelhos_fora, tipo="gols"
             )
             
             print(f"   [AVALIAÇÃO] {time_casa} x {time_fora} | Nota IA: {nota_pressao} | Prob Poisson: {prob_gols:.2f}")
@@ -345,11 +383,14 @@ def processar_partidas():
             if nota_pressao >= 6 and prob_gols >= 0.35:
                 grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
 
+                aviso_vermelho_txt = f"\n🟥 **Cartões Vermelhos:** {time_casa} ({vermelhos_casa}) x {time_fora} ({vermelhos_fora})" if (vermelhos_casa > 0 or vermelhos_fora > 0) else ""
+
                 mensagem = (
                     f"🚨 **TENDÊNCIA PARA GOL ({periodo_etapa})** 🚨\n\n"
                     f"🏆 Liga: {liga}\n"
                     f"⚽ Partida: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-                    f"⏱️ Alerta aos {minuto}' ({periodo_etapa}) • Placar {gols_casa}-{gols_fora}\n\n"
+                    f"⏱️ Alerta aos {minuto}' ({periodo_etapa}) • Placar {gols_casa}-{gols_fora}"
+                    f"{aviso_vermelho_txt}\n\n"
                     f"📊 **Estatísticas Reais:**\n"
                     f"• Posse: {estats['posse_casa']} x {estats['posse_fora']}\n"
                     f"• Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']}\n"
@@ -371,8 +412,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada.")
 
 if __name__ == "__main__":
-    print("🤖 Robô iniciado com correção no cálculo de Poisson!")
-    enviar_alerta_telegram("🚀 *Robô de apostas reiniciado com correção no cálculo de Poisson!*")
+    print("🤖 Robô iniciado com integração de Cartões Vermelhos e Eventos!")
+    enviar_alerta_telegram("🚀 *Robô de apostas reiniciado com suporte a cartões vermelhos e eventos!*")
     
     while True:
         try:
