@@ -34,7 +34,8 @@ LIGAS_PRINCIPAIS = [
     "brasileiro", "copa do brasil", "liga profesional", "primera division", 
     "primeira liga", "eredivisie", "championship", "super lig", "pro league", 
     "superligaen", "allsvenskan", "eliteserien", "saudi professional league", 
-    "mls", "j1 league", "k league", "liga mx", "liga 1", "primera a", "copa uruguay"
+    "mls", "j1 league", "k league", "liga mx", "liga 1", "primera a", "copa uruguay",
+    "egyptian second division a", "u17 brasileiro", "pro liga"
 ]
 
 def validar_liga_principal(nome_liga):
