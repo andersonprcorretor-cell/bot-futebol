@@ -75,7 +75,6 @@ def buscar_jogos_ao_vivo():
         response = requests.get(url, headers=HEADERS_API, params=params, timeout=15)
         if response.status_code == 200:
             dados = response.json().get('response', [])
-            print(f"[API] Total de jogos ao vivo retornados pela API: {len(dados)}")
             return dados
         else:
             print(f"[ERRO API JOGOS] Status {response.status_code}: {response.text}")
@@ -325,7 +324,6 @@ def processar_partidas():
             }
             continue 
             
-        # FILTROS EQUILIBRADOS: Janelas moderadas para evitar extremos (nem muito restrito, nem spam)
         rolando_1t = (status_short == '1H' and 8 <= minuto <= 43)
         rolando_2t = (status_short == '2H' and 50 <= minuto <= 86)
 
@@ -335,8 +333,11 @@ def processar_partidas():
             
             estats = extrair_estatisticas(fixture_id)
             
-            # Trava anti-zero: descarta se a API retornar dados vazios na liga principal
+            # DIAGNÓSTICO: Mostra no log os valores extraídos para validação imediata
+            print(f"   [DIAGNÓSTICO STATS] {time_casa} x {time_fora} | Chutes: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']} | Cantos: {estats['cantos_casa']}x{estats['cantos_fora']}")
+
             if estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0:
+                print(f"   [IGNORADO] {time_casa} x {time_fora} - Estatísticas vieram zeradas.")
                 continue
 
             estats_avancadas = extrair_estatisticas_avancadas(fixture_id)
@@ -346,7 +347,8 @@ def processar_partidas():
                 liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="gols"
             )
             
-            # FILTROS MODERADOS: Nota de pressão >= 6 e probabilidade >= 35%
+            print(f"   [AVALIAÇÃO] {time_casa} x {time_fora} | Nota IA: {nota_pressao} | Prob Poisson: {prob_gols:.2f}")
+
             if nota_pressao >= 6 and prob_gols >= 0.35:
                 grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
 
@@ -376,8 +378,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada.")
 
 if __name__ == "__main__":
-    print("🤖 Robô iniciado com ligas principais e filtros equilibrados!")
-    enviar_alerta_telegram("🚀 *Robô de apostas reiniciado com ligas principais e filtros equilibrados!*")
+    print("🤖 Robô iniciado com diagnóstico de estatísticas ativado!")
+    enviar_alerta_telegram("🚀 *Robô de apostas reiniciado com diagnóstico de estatísticas ativado!*")
     
     while True:
         try:
