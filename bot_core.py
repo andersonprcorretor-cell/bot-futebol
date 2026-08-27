@@ -25,16 +25,16 @@ CONTROLE_GOLS = {}
 MONITORAMENTO_FEEDBACK = {}
 HISTORICO_MOMENTUM = {}
 
-# ATIVADO: FILTRA APENAS LIGAS PRINCIPAIS COM COBERTURA ESTATÍSTICA REAL
+# ATIVADO: Filtra apenas ligas principais e competitivas do mundo
 FILTRAR_APENAS_LIGAS_PRINCIPAIS = True
 
 LIGAS_PRINCIPAIS = [
-    "libertadores", "sudamericana", "champions", "europa league", "conference", 
+    "libertadores", "sudamericana", "champions league", "europa league", "conference league", 
     "premier league", "la liga", "bundesliga", "ligue 1", "serie a", "serie b",
-    "brasileiro", "copa do brasil", "liga professional", "primera division", 
-    "primera", "primeira liga", "eredivisie", "championship", "segunda", 
-    "super lig", "pro league", "superligaen", "allsvenskan", "eliteserien", 
-    "saudi professional league", "mls", "j1 league", "k league", "liga mx", "liga 1"
+    "brasileiro", "copa do brasil", "liga profesional", "primera division", 
+    "primeira liga", "eredivisie", "championship", "super lig", "pro league", 
+    "superligaen", "allsvenskan", "eliteserien", "saudi professional league", 
+    "mls", "j1 league", "k league", "liga mx", "liga 1", "primera a"
 ]
 
 def validar_liga_principal(nome_liga):
@@ -232,7 +232,7 @@ def gerar_grafico_momentum(fixture_id, intensidade_atual_valor):
 
 def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="gols"):
     if not client_ai:
-        return 8, f"• O volume ofensivo apresentado por {time_casa} e {time_fora} demonstra clara pressão territorial.\n• Os indicadores estatísticos sustentam a expectativa de movimentação no placar."
+        return 7, f"• O volume ofensivo apresentado por {time_casa} e {time_fora} demonstra clara pressão territorial.\n• Os indicadores estatísticos sustentam a expectativa de movimentação no placar."
     
     resumo_stats = (
         f"Posse: {estats['posse_casa']} x {estats['posse_fora']} | "
@@ -260,7 +260,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         texto_resposta = response.text.strip()
         linhas = [l.strip() for l in texto_resposta.split('\n') if l.strip()]
         
-        nota_num = 8
+        nota_num = 7
         indice_inicio_texto = 0
         if linhas:
             match = re.search(r'\d+', linhas[0])
@@ -280,7 +280,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
             
         return nota_num, analise_linhas
     except Exception as e:
-        return 8, (
+        return 7, (
             f"• A circulação de bola entre {time_casa} e {time_fora} demonstra alta intensidade.\n"
             f"• O volume de ações ofensivas consolidadas reflete o ritmo imposto no {periodo_etapa}.\n"
             f"• A dinâmica estrutural aos {minuto}' sustenta expectativas para o mercado de {tipo}."
@@ -325,8 +325,9 @@ def processar_partidas():
             }
             continue 
             
-        rolando_1t = (status_short == '1H' and 10 <= minuto <= 42)
-        rolando_2t = (status_short == '2H' and 55 <= minuto <= 85)
+        # FILTROS EQUILIBRADOS: Janelas moderadas para evitar extremos (nem muito restrito, nem spam)
+        rolando_1t = (status_short == '1H' and 8 <= minuto <= 43)
+        rolando_2t = (status_short == '2H' and 50 <= minuto <= 86)
 
         chave_gols = f"{fixture_id}_gols"
         if (rolando_1t or rolando_2t) and chave_gols not in CACHE_ALERTAS_ENVIADOS:
@@ -334,7 +335,7 @@ def processar_partidas():
             
             estats = extrair_estatisticas(fixture_id)
             
-            # Trava de segurança: se a API retornar estatísticas totalmente zeradas, pula para evitar falso alerta
+            # Trava anti-zero: descarta se a API retornar dados vazios na liga principal
             if estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0:
                 continue
 
@@ -345,7 +346,8 @@ def processar_partidas():
                 liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="gols"
             )
             
-            if nota_pressao >= 7 and prob_gols >= 0.45:
+            # FILTROS MODERADOS: Nota de pressão >= 6 e probabilidade >= 35%
+            if nota_pressao >= 6 and prob_gols >= 0.35:
                 grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
 
                 mensagem = (
@@ -363,7 +365,7 @@ def processar_partidas():
                     f"🎯 Mercado Sugerido: Mais de {total_gols_atual + 0.5} Gols ({periodo_etapa})\n"
                     f"💡 **Análise da Partida:**\n"
                     f"{analise_ia}\n\n"
-                    f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
+                    f"⚠️ Gerencie sua banca com responsabilidade."
                 )
                 
                 msg_id = enviar_alerta_telegram(mensagem)
@@ -374,8 +376,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada.")
 
 if __name__ == "__main__":
-    print("🤖 Robô iniciado com filtro de ligas principais e segurança estatística!")
-    enviar_alerta_telegram("🚀 *Robô de apostas reiniciado com filtro de ligas principais ativo!*")
+    print("🤖 Robô iniciado com ligas principais e filtros equilibrados!")
+    enviar_alerta_telegram("🚀 *Robô de apostas reiniciado com ligas principais e filtros equilibrados!*")
     
     while True:
         try:
