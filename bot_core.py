@@ -24,6 +24,7 @@ CACHE_ALERTAS_ENVIADOS = {}
 CACHE_HALFTIME_ENVIADOS = {}
 CONTROLE_GOLS = {}
 HISTORICO_MOMENTUM = {}
+ALERTAS_PARA_AVALIAR = {}
 
 FILTRAR_APENAS_LIGAS_PRINCIPAIS = True
 
@@ -319,10 +320,47 @@ def processar_partidas():
         print("[AVISO] Nenhum jogo ao vivo retornado pela API neste ciclo.")
         return
 
-    global CACHE_ALERTAS_ENVIADOS, CACHE_HALFTIME_ENVIADOS, CONTROLE_GOLS
+    global CACHE_ALERTAS_ENVIADOS, CACHE_HALFTIME_ENVIADOS, CONTROLE_GOLS, ALERTAS_PARA_AVALIAR
     tempo_atual = time.time()
     CACHE_ALERTAS_ENVIADOS = {fid: ts for fid, ts in CACHE_ALERTAS_ENVIADOS.items() if tempo_atual - ts < 1200}
     CACHE_HALFTIME_ENVIADOS = {fid: ts for fid, ts in CACHE_HALFTIME_ENVIADOS.items() if tempo_atual - ts < 7200}
+
+    # ==========================================
+    # AVALIAÇÃO DE ALERTAS PENDENTES (GREEN / RED)
+    # ==========================================
+    chaves_para_remover = []
+    for chave_alerta, dados in ALERTAS_PARA_AVALIAR.items():
+        fid = dados["fixture_id"]
+        jogo_atual = next((j for j in jogos if j['fixture']['id'] == fid), None)
+        
+        if jogo_atual:
+            gc = jogo_atual['goals']['home'] if jogo_atual['goals']['home'] is not None else 0
+            gf = jogo_atual['goals']['away'] if jogo_atual['goals']['away'] is not None else 0
+            gols_atuais_partida = gc + gf
+            st_short = jogo_atual['fixture']['status']['short']
+            min_atual = jogo_atual['fixture']['status']['elapsed'] or 0
+            
+            gols_inicial = dados["gols_inicial"]
+            periodo = dados["periodo"]
+            msg_id = dados["msg_id"]
+            tc = dados["time_casa"]
+            tf = dados["time_fora"]
+            
+            if gols_atuais_partida > gols_inicial:
+                msg_green = f"✅ **GREEN!** Gol saiu após o alerta! ({tc} {gc}x{gf} {tf})"
+                enviar_alerta_telegram(msg_green, reply_to_id=msg_id)
+                chaves_para_remover.append(chave_alerta)
+            elif periodo == "1T" and (st_short == 'HT' or st_short == '2H' or min_atual >= 45):
+                msg_red = f"❌ **RED.** O 1º tempo terminou sem alteração no placar ({tc} {gc}x{gf} {tf})."
+                enviar_alerta_telegram(msg_red, reply_to_id=msg_id)
+                chaves_para_remover.append(chave_alerta)
+            elif periodo == "2T" and (st_short in ['FT', 'AET', 'PEN'] or min_atual >= 90):
+                msg_red = f"❌ **RED.** O jogo terminou sem gol após o alerta no 2º tempo ({tc} {gc}x{gf} {tf})."
+                enviar_alerta_telegram(msg_red, reply_to_id=msg_id)
+                chaves_para_remover.append(chave_alerta)
+
+    for chave in chaves_para_remover:
+        ALERTAS_PARA_AVALIAR.pop(chave, None)
 
     for jogo in jogos:
         liga = jogo['league']['name']
@@ -400,7 +438,6 @@ def processar_partidas():
             estats = extrair_estatisticas(fixture_id)
             vermelhos_casa, vermelhos_fora = analisar_eventos_partida(fixture_id, home_id, away_id)
             
-            # LOG DE DIAGNÓSTICO: Mostra claramente os valores extraídos da API para cada partida em andamento
             print(f"      [DEBUG STATS] {time_casa} x {time_fora} | Chutes: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']} | Cantos: {estats['cantos_casa']}x{estats['cantos_fora']}")
 
             if estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0 and vermelhos_casa == 0 and vermelhos_fora == 0:
@@ -412,7 +449,6 @@ def processar_partidas():
                 liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, vermelhos_casa, vermelhos_fora
             )
 
-            # LOG DE AVALIAÇÃO: Mostra a nota atribuída pela IA e a probabilidade matemática calculada
             print(f"      [AVALIAÇÃO] Nota IA: {nota_pressao}/10 | Prob. Poisson: {prob_gols:.2f}")
 
             if nota_pressao >= 6 and prob_gols >= 0.35:
@@ -445,6 +481,14 @@ def processar_partidas():
                 if msg_id:
                     print(f"    [ALERTA GOLS ENVIADO] 🚨 {time_casa} x {time_fora} aos {minuto}'")
                     CACHE_ALERTAS_ENVIADOS[chave_gols] = tempo_atual
+                    ALERTAS_PARA_AVALIAR[f"{fixture_id}_{periodo_etapa}"] = {
+                        "msg_id": msg_id,
+                        "gols_inicial": total_gols_atual,
+                        "periodo": periodo_etapa,
+                        "time_casa": time_casa,
+                        "time_fora": time_fora,
+                        "fixture_id": fixture_id
+                    }
 
     print(f"[{hora_atual}] Varredura finalizada.")
 
