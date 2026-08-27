@@ -25,14 +25,27 @@ CONTROLE_GOLS = {}
 MONITORAMENTO_FEEDBACK = {}
 HISTORICO_MOMENTUM = {}
 
-# REGRAS RELAXADAS PARA TESTE
-FILTRAR_APENAS_LIGAS_PRINCIPAIS = False
+# ATIVADO: FILTRA APENAS LIGAS PRINCIPAIS COM COBERTURA ESTATÍSTICA REAL
+FILTRAR_APENAS_LIGAS_PRINCIPAIS = True
 
-LIGAS_PRINCIPAIS = []
+LIGAS_PRINCIPAIS = [
+    "libertadores", "sudamericana", "champions", "europa league", "conference", 
+    "premier league", "la liga", "bundesliga", "ligue 1", "serie a", "serie b",
+    "brasileiro", "copa do brasil", "liga professional", "primera division", 
+    "primera", "primeira liga", "eredivisie", "championship", "segunda", 
+    "super lig", "pro league", "superligaen", "allsvenskan", "eliteserien", 
+    "saudi professional league", "mls", "j1 league", "k league", "liga mx", "liga 1"
+]
 
 def validar_liga_principal(nome_liga):
     if not FILTRAR_APENAS_LIGAS_PRINCIPAIS:
         return True
+    if not nome_liga:
+        return False
+    nome_lower = nome_liga.lower()
+    for termo in LIGAS_PRINCIPAIS:
+        if termo in nome_lower:
+            return True
     return False
 
 def enviar_alerta_telegram(mensagem, reply_to_id=None):
@@ -75,7 +88,6 @@ def buscar_estatisticas_partida(fixture_id):
     params = {"fixture": int(fixture_id)}
     try:
         response = requests.get(url, headers=HEADERS_API, params=params, timeout=10)
-        print(f"[DEBUG API STATS] Fixture {fixture_id} | Status: {response.status_code} | Resposta: {response.text}")
         if response.status_code == 200:
             return response.json().get('response', [])
     except Exception as e:
@@ -289,6 +301,10 @@ def processar_partidas():
 
     for jogo in jogos:
         liga = jogo['league']['name']
+        
+        if not validar_liga_principal(liga):
+            continue
+
         fixture_id = jogo['fixture']['id']
         time_casa = jogo['teams']['home']['name']
         time_fora = jogo['teams']['away']['name']
@@ -309,15 +325,19 @@ def processar_partidas():
             }
             continue 
             
-        # REGRAS DE MINUTAGEM FLEXIBILIZADAS PARA TESTE
-        rolando_1t = (status_short == '1H' and minuto >= 1)
-        rolando_2t = (status_short == '2H' and minuto >= 46)
+        rolando_1t = (status_short == '1H' and 10 <= minuto <= 42)
+        rolando_2t = (status_short == '2H' and 55 <= minuto <= 85)
 
         chave_gols = f"{fixture_id}_gols"
         if (rolando_1t or rolando_2t) and chave_gols not in CACHE_ALERTAS_ENVIADOS:
             periodo_etapa = "1T" if status_short == '1H' else "2T"
             
             estats = extrair_estatisticas(fixture_id)
+            
+            # Trava de segurança: se a API retornar estatísticas totalmente zeradas, pula para evitar falso alerta
+            if estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0:
+                continue
+
             estats_avancadas = extrair_estatisticas_avancadas(fixture_id)
             _, prob_gols = projetar_gols_avancados(total_gols_atual, minuto, status_short)
 
@@ -325,8 +345,7 @@ def processar_partidas():
                 liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="gols"
             )
             
-            # FILTROS DE NOTA E PROBABILIDADE ZERADOS PARA TESTE
-            if nota_pressao >= 1 and prob_gols >= 0.0:
+            if nota_pressao >= 7 and prob_gols >= 0.45:
                 grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
 
                 mensagem = (
@@ -344,7 +363,7 @@ def processar_partidas():
                     f"🎯 Mercado Sugerido: Mais de {total_gols_atual + 0.5} Gols ({periodo_etapa})\n"
                     f"💡 **Análise da Partida:**\n"
                     f"{analise_ia}\n\n"
-                    f"⚠️ Alerta de teste — gerencie sua banca."
+                    f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
                 )
                 
                 msg_id = enviar_alerta_telegram(mensagem)
@@ -355,8 +374,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada.")
 
 if __name__ == "__main__":
-    print("🤖 Robô em modo de teste flexibilizado!")
-    enviar_alerta_telegram("🚀 *Robô em modo de teste flexibilizado iniciado com sucesso!*")
+    print("🤖 Robô iniciado com filtro de ligas principais e segurança estatística!")
+    enviar_alerta_telegram("🚀 *Robô de apostas reiniciado com filtro de ligas principais ativo!*")
     
     while True:
         try:
