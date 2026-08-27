@@ -247,7 +247,7 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
     
     try:
         response = client_ai.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.6-flash',
             contents=prompt
         )
         texto_resposta = response.text.strip()
@@ -298,7 +298,7 @@ def gerar_analise_intervalo(liga, time_casa, time_fora, gols_casa, gols_fora, es
     )
     try:
         response = client_ai.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.6-flash',
             contents=prompt
         )
         return response.text.strip()
@@ -442,8 +442,8 @@ def processar_partidas():
     print(f"[{hora_atual}] Varredura finalizada.")
 
 if __name__ == "__main__":
-    print("🤖 Robô iniciado com Análise Inteligente Avançada e Força de Dados!")
-    enviar_alerta_telegram("🚀 *Robô atualizado com Análise Avançada e Conexão Reforçada com a IA!*")
+    print("🤖 Robô iniciado com Análise Inteligente Atualizada (Gemini 3.6 Flash)!")
+    enviar_alerta_telegram("🚀 *Robô atualizado e conectado com sucesso ao modelo Gemini 3.6 Flash!*")
     
     while True:
         try:
