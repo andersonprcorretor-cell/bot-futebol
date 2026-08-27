@@ -343,7 +343,7 @@ def processar_partidas():
         minuto = jogo['fixture']['status']['elapsed'] or 0
         status_short = jogo['fixture']['status']['short']
         
-        print(f"   [MONITORANDO] {liga} | {time_casa} {gols_casa}x{gols_fora} {time_fora} | Minuto: {minuto}' ({status_short})")
+        print(f"    [MONITORANDO] {liga} | {time_casa} {gols_casa}x{gols_fora} {time_fora} | Minuto: {minuto}' ({status_short})")
         
         if fixture_id not in CONTROLE_GOLS:
             CONTROLE_GOLS[fixture_id] = {
@@ -384,11 +384,11 @@ def processar_partidas():
                 
                 msg_id = enviar_alerta_telegram(mensagem_ht)
                 if msg_id:
-                    print(f"   [ALERTA INTERVALO ENVIADO] ☕ {time_casa} x {time_fora} (HT)")
+                    print(f"    [ALERTA INTERVALO ENVIADO] ☕ {time_casa} x {time_fora} (HT)")
                     CACHE_HALFTIME_ENVIADOS[fixture_id] = tempo_atual
 
         # ==========================================
-        # MONITORAMENTO DE JOGO ROLANDO
+        # MONITORAMENTO DE JOGO ROLANDO (COM DIAGNÓSTICO)
         # ==========================================
         rolando_1t = (status_short == '1H' and 8 <= minuto <= 43)
         rolando_2t = (status_short == '2H' and 50 <= minuto <= 86)
@@ -400,13 +400,20 @@ def processar_partidas():
             estats = extrair_estatisticas(fixture_id)
             vermelhos_casa, vermelhos_fora = analisar_eventos_partida(fixture_id, home_id, away_id)
             
+            # LOG DE DIAGNÓSTICO: Mostra claramente os valores extraídos da API para cada partida em andamento
+            print(f"      [DEBUG STATS] {time_casa} x {time_fora} | Chutes: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']} | Cantos: {estats['cantos_casa']}x{estats['cantos_fora']}")
+
             if estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0 and vermelhos_casa == 0 and vermelhos_fora == 0:
+                print(f"      [IGNORADO] Estatísticas zeradas na API para {time_casa} x {time_fora}")
                 continue
 
             _, prob_gols = projetar_gols_avancados(total_gols_atual, minuto, status_short, vermelhos_casa, vermelhos_fora)
             nota_pressao, analise_ia = gerar_analise_inteligente(
                 liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, vermelhos_casa, vermelhos_fora
             )
+
+            # LOG DE AVALIAÇÃO: Mostra a nota atribuída pela IA e a probabilidade matemática calculada
+            print(f"      [AVALIAÇÃO] Nota IA: {nota_pressao}/10 | Prob. Poisson: {prob_gols:.2f}")
 
             if nota_pressao >= 6 and prob_gols >= 0.35:
                 grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
@@ -436,7 +443,7 @@ def processar_partidas():
                 
                 msg_id = enviar_alerta_telegram(mensagem)
                 if msg_id:
-                    print(f"   [ALERTA GOLS ENVIADO] 🚨 {time_casa} x {time_fora} aos {minuto}'")
+                    print(f"    [ALERTA GOLS ENVIADO] 🚨 {time_casa} x {time_fora} aos {minuto}'")
                     CACHE_ALERTAS_ENVIADOS[chave_gols] = tempo_atual
 
     print(f"[{hora_atual}] Varredura finalizada.")
