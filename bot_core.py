@@ -170,6 +170,16 @@ def extrair_estatisticas(fixture_id):
                     stats[f"chutes_bloqueados_{sufixo}"] = val_limpo
                 elif "corner kicks" in stype:
                     stats[f"cantos_{sufixo}"] = val_limpo
+                    
+        # ======================================================================
+        # CORREÇÃO: Garante que os chutes totais não fiquem zerados se houver
+        # finalizações computadas (fallback caso a API omita o 'Total Shots')
+        # ======================================================================
+        for sufixo in ["casa", "fora"]:
+            soma_chutes = stats[f"chutes_alvo_{sufixo}"] + stats[f"chutes_fora_{sufixo}"] + stats[f"chutes_bloqueados_{sufixo}"]
+            if stats[f"chutes_totais_{sufixo}"] < soma_chutes:
+                stats[f"chutes_totais_{sufixo}"] = soma_chutes
+
     except Exception as e:
         print(f"[EXCEÇÃO ESTATÍSTICAS] {e}")
         
