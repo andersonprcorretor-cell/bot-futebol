@@ -391,12 +391,18 @@ def processar_partidas():
             continue 
 
         # ==========================================
+        # EXTRAÇÃO UNIVERSAL PARA LOGS EM TEMPO REAL
+        # ==========================================
+        estats = extrair_estatisticas(fixture_id)
+        vermelhos_casa, vermelhos_fora = analisar_eventos_partida(fixture_id, home_id, away_id)
+        
+        # Log detalhado visível em TODA varredura para acompanhar os valores reais da API
+        print(f"      [DADOS API] {time_casa} x {time_fora} | Posse: {estats['posse_casa']}x{estats['posse_fora']} | Chutes: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']} (Alvo: {estats['chutes_alvo_casa']}x{estats['chutes_alvo_fora']}) | Cantos: {estats['cantos_casa']}x{estats['cantos_fora']} | Vermelhos: {vermelhos_casa}x{vermelhos_fora}")
+
+        # ==========================================
         # PROCESSAMENTO DE INTERVALO (HT)
         # ==========================================
         if status_short == 'HT' and fixture_id not in CACHE_HALFTIME_ENVIADOS:
-            estats = extrair_estatisticas(fixture_id)
-            vermelhos_casa, vermelhos_fora = analisar_eventos_partida(fixture_id, home_id, away_id)
-            
             if not (estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0):
                 analise_ht = gerar_analise_intervalo(liga, time_casa, time_fora, gols_casa, gols_fora, estats, vermelhos_casa, vermelhos_fora)
                 aviso_vermelho_txt = f"\n🟥 **Cartões Vermelhos no 1T:** {time_casa} ({vermelhos_casa}) x {time_fora} ({vermelhos_fora})" if (vermelhos_casa > 0 or vermelhos_fora > 0) else ""
@@ -426,7 +432,7 @@ def processar_partidas():
                     CACHE_HALFTIME_ENVIADOS[fixture_id] = tempo_atual
 
         # ==========================================
-        # MONITORAMENTO DE JOGO ROLANDO (COM DIAGNÓSTICO)
+        # MONITORAMENTO DE JOGO ROLANDO
         # ==========================================
         rolando_1t = (status_short == '1H' and 8 <= minuto <= 43)
         rolando_2t = (status_short == '2H' and 50 <= minuto <= 86)
@@ -434,11 +440,6 @@ def processar_partidas():
         chave_gols = f"{fixture_id}_gols"
         if (rolando_1t or rolando_2t) and chave_gols not in CACHE_ALERTAS_ENVIADOS:
             periodo_etapa = "1T" if status_short == '1H' else "2T"
-            
-            estats = extrair_estatisticas(fixture_id)
-            vermelhos_casa, vermelhos_fora = analisar_eventos_partida(fixture_id, home_id, away_id)
-            
-            print(f"      [DEBUG STATS] {time_casa} x {time_fora} | Chutes: {estats['chutes_totais_casa']}x{estats['chutes_totais_fora']} | Cantos: {estats['cantos_casa']}x{estats['cantos_fora']}")
 
             if estats['chutes_totais_casa'] == 0 and estats['chutes_totais_fora'] == 0 and estats['cantos_casa'] == 0 and estats['cantos_fora'] == 0 and vermelhos_casa == 0 and vermelhos_fora == 0:
                 print(f"      [IGNORADO] Estatísticas zeradas na API para {time_casa} x {time_fora}")
