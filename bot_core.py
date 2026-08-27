@@ -25,26 +25,14 @@ CONTROLE_GOLS = {}
 MONITORAMENTO_FEEDBACK = {}
 HISTORICO_MOMENTUM = {}
 
-FILTRAR_APENAS_LIGAS_PRINCIPAIS = True
+# REGRAS RELAXADAS PARA TESTE
+FILTRAR_APENAS_LIGAS_PRINCIPAIS = False
 
-LIGAS_PRINCIPAIS = [
-    "libertadores", "sudamericana", "champions", "europa league", "conference", 
-    "premier league", "la liga", "bundesliga", "ligue 1", "serie a", "serie b",
-    "brasileiro", "copa do brasil", "liga professional", "primera division", 
-    "primera", "primeira liga", "eredivisie", "championship", "segunda", 
-    "super lig", "pro league", "superligaen", "allsvenskan", "eliteserien", 
-    "saudi professional league", "mls", "j1 league", "k league", "liga mx", "liga 1"
-]
+LIGAS_PRINCIPAIS = []
 
 def validar_liga_principal(nome_liga):
     if not FILTRAR_APENAS_LIGAS_PRINCIPAIS:
         return True
-    if not nome_liga:
-        return False
-    nome_lower = nome_liga.lower()
-    for termo in LIGAS_PRINCIPAIS:
-        if termo in nome_lower:
-            return True
     return False
 
 def enviar_alerta_telegram(mensagem, reply_to_id=None):
@@ -105,7 +93,6 @@ def extrair_estatisticas(fixture_id):
     }
     
     stats_lista = buscar_estatisticas_partida(fixture_id)
-    
     if not stats_lista or len(stats_lista) < 2:
         return stats
 
@@ -259,28 +246,14 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         f"Cantos: {estats['cantos_casa']} x {estats['cantos_fora']}"
     )
 
-    if estats_avancadas['xg_casa'] > 0.0 or estats_avancadas['xg_fora'] > 0.0:
-        resumo_stats += f" | xG: {estats_avancadas['xg_casa']} x {estats_avancadas['xg_fora']}"
-        
-    if estats_avancadas['chutes_bloqueados_casa'] > 0 or estats_avancadas['chutes_bloqueados_fora'] > 0:
-        resumo_stats += f" | Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']}"
-
     prompt = (
         f"Você é um Analista Tático Sênior e Trader Esportivo Quantitativo de elite. "
-        f"Sua missão é criar uma análise EXCLUSIVA, personalizada e cirúrgica para o jogo entre {time_casa} e {time_fora} "
+        f"Sua missão é criar uma análise EXCLUSIVA para o jogo entre {time_casa} e {time_fora} "
         f"pela competição {liga}, atualmente no minuto {minuto}' do {periodo_etapa} com o placar de {gols_casa} a {gols_fora}.\n\n"
-        f"ESTATÍSTICAS ATUAIS DA PARTIDA:\n{resumo_stats}\n\n"
-        f"DIRETRIZES RIGOROSAS PARA A ANÁLISE DE MERCADO DE {tipo.upper()}:\n"
-        f"- NUNCA utilize respostas genéricas ou clichês repetitivos. Cada jogo tem uma dinâmica única que deve ser respeitada.\n"
-        f"- Mencione explicitamente o comportamento dos times com base nos números acima.\n"
-        f"- Conecte a minutagem atual ({minuto} minutos) com a urgência do placar ({gols_casa}x{gols_fora}).\n\n"
+        f"ESTATÍSTICAS ATUAIS:\n{resumo_stats}\n\n"
         f"REGRAS DE FORMATAÇÃO OBRIGATÓRIAS:\n"
-        f"1. Na PRIMEIRA LINHA, escreva APENAS um número inteiro de 1 a 10 (representando a força da tendência para o mercado de {tipo}).\n"
-        f"2. A partir da segunda linha, escreva EXATAMENTE 3 tópicos curtos, analíticos e customizados, começando cada um com '• '.\n"
-        f"3. Tópico 1: Contextualize a posse, o controle territorial e qual equipe está ditando o ritmo neste momento exato.\n"
-        f"4. Tópico 2: Analise o volume de finalizações, infiltrações ou escanteios gerados com base nos números do jogo.\n"
-        f"5. Tópico 3: Dê o veredito situacional explicando o porquê de abrir oportunidade no mercado de {tipo} agora.\n"
-        f"Seja direto, técnico e use terminologia de trader profissional."
+        f"1. Na PRIMEIRA LINHA, escreva APENAS um número inteiro de 1 a 10.\n"
+        f"2. A partir da segunda linha, escreva EXATAMENTE 3 tópicos começando com '• '."
     )
     
     try:
@@ -293,7 +266,6 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         
         nota_num = 8
         indice_inicio_texto = 0
-        
         if linhas:
             match = re.search(r'\d+', linhas[0])
             if match:
@@ -303,20 +275,19 @@ def gerar_analise_inteligente(liga, time_casa, time_fora, gols_casa, gols_fora, 
         nota_num = max(1, min(10, nota_num))
         analise_linhas = "\n".join(linhas[indice_inicio_texto:]).strip()
         
-        if len(analise_linhas) < 20:
+        if len(analise_linhas) < 10:
             analise_linhas = (
-                f"• {time_casa} e {time_fora} alternam investidas ofensivas na busca por espaços na defesa adversária.\n"
-                f"• A proporção de finalizações e o contexto do placar aos {minuto}' exigem atenção redobrada no setor defensivo.\n"
-                f"• O cenário tático atual apresenta indícios claros favoráveis à movimentação no mercado de {tipo}."
+                f"• {time_casa} e {time_fora} alternam investidas ofensivas na busca por espaços.\n"
+                f"• A proporção de finalizações exige atenção redobrada no setor defensivo.\n"
+                f"• O cenário tático atual apresenta indícios favoráveis ao mercado de {tipo}."
             )
             
         return nota_num, analise_linhas
     except Exception as e:
-        print(f"[ERRO IA] Falha na geração do conteúdo: {e}")
         return 8, (
-            f"• A circulação de bola entre {time_casa} e {time_fora} demonstra uma tentativa clara de quebra de linhas.\n"
-            f"• O volume de ações ofensivas consolidadas reflete a intensidade imposta no {periodo_etapa}.\n"
-            f"• A dinâmica estrutural aos {minuto}' sustenta expectativas elevadas para o mercado de {tipo}."
+            f"• A circulação de bola entre {time_casa} e {time_fora} demonstra alta intensidade.\n"
+            f"• O volume de ações ofensivas consolidadas reflete o ritmo imposto no {periodo_etapa}.\n"
+            f"• A dinâmica estrutural aos {minuto}' sustenta expectativas para o mercado de {tipo}."
         )
 
 def processar_partidas():
@@ -332,51 +303,8 @@ def processar_partidas():
     tempo_atual = time.time()
     CACHE_ALERTAS_ENVIADOS = {fid: ts for fid, ts in CACHE_ALERTAS_ENVIADOS.items() if tempo_atual - ts < 1200}
 
-    jogos_para_remover = []
-    for chave_fb, dados_fb in MONITORAMENTO_FEEDBACK.items():
-        fixture_id = dados_fb['fixture_id']
-        jogo_encontrado = next((j for j in jogos if j['fixture']['id'] == fixture_id), None)
-        if jogo_encontrado:
-            g_c = jogo_encontrado['goals']['home'] or 0
-            g_f = jogo_encontrado['goals']['away'] or 0
-            total_gols_agora = g_c + g_f
-            minuto_agora = jogo_encontrado['fixture']['status']['elapsed'] or 0
-            msg_id_origem = dados_fb.get('msg_id')
-            estats_atuais = extrair_estatisticas(fixture_id)
-            total_cantos_agora = estats_atuais['cantos_casa'] + estats_atuais['cantos_fora']
-
-            if minuto_agora <= dados_fb['minuto_alerta']:
-                continue
-
-            if dados_fb['tipo'] == 'gols':
-                if total_gols_agora > dados_fb['gols_no_alerta']:
-                    minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
-                    enviar_alerta_telegram(f"✅ **GREEN / GOL CONFIRMADO!** ✅\n\n⚽ Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n⏱️ Gol aos {minuto_agora}' (Alerta aos {dados_fb['minuto_alerta']}')\n⏳ Reação: {minutos_para_agir} min", reply_to_id=msg_id_origem)
-                    jogos_para_remover.append(chave_fb)
-                elif (minuto_agora - dados_fb['minuto_alerta']) > 15:
-                    jogos_para_remover.append(chave_fb)
-            elif dados_fb['tipo'] == 'escanteios':
-                meta_cantos = dados_fb['meta_cantos']
-                if total_cantos_agora >= meta_cantos:
-                    minutos_para_agir = minuto_agora - dados_fb['minuto_alerta']
-                    enviar_alerta_telegram(f"✅ **ESCANTEIOS BATERAM!** 🎯\n\n🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_agora} cantos\n⏳ Reação: {minutos_para_agir} min", reply_to_id=msg_id_origem)
-                    jogos_para_remover.append(chave_fb)
-                elif minuto_agora >= 89 or (minuto_agora - dados_fb['minuto_alerta']) > 15:
-                    enviar_alerta_telegram(f"🔴 **ESCANTEIOS NÃO BATERAM**\n\n🚩 Partida: {dados_fb['time_casa']} {g_c} x {g_f} {dados_fb['time_fora']}\n⏱️ Alerta aos {dados_fb['minuto_alerta']}' | Fechou com {total_cantos_agora} cantos", reply_to_id=msg_id_origem)
-                    jogos_para_remover.append(chave_fb)
-        else:
-            jogos_para_remover.append(chave_fb)
-            
-    for chave_fb in jogos_para_remover:
-        MONITORAMENTO_FEEDBACK.pop(chave_fb, None)
-
-    alertas_enviados_ciclo = 0
     for jogo in jogos:
         liga = jogo['league']['name']
-        
-        if not validar_liga_principal(liga):
-            continue
-
         fixture_id = jogo['fixture']['id']
         time_casa = jogo['teams']['home']['name']
         time_fora = jogo['teams']['away']['name']
@@ -397,18 +325,9 @@ def processar_partidas():
             }
             continue 
             
-        estado_jogo = CONTROLE_GOLS[fixture_id]
-        
-        if total_gols_atual > estado_jogo['total_gols']:
-            CONTROLE_GOLS[fixture_id]['total_gols'] = total_gols_atual
-            CONTROLE_GOLS[fixture_id]['minuto_ultimo_gol'] = minuto
-            continue
-        
-        if (minuto - estado_jogo['minuto_ultimo_gol']) < 5:
-            continue
-            
-        rolando_1t = (status_short == '1H' and 10 <= minuto <= 42)
-        rolando_2t = (status_short == '2H' and 55 <= minuto <= 85)
+        # REGRAS DE MINUTAGEM FLEXIBILIZADAS PARA TESTE
+        rolando_1t = (status_short == '1H' and minuto >= 1)
+        rolando_2t = (status_short == '2H' and minuto >= 46)
 
         chave_gols = f"{fixture_id}_gols"
         if (rolando_1t or rolando_2t) and chave_gols not in CACHE_ALERTAS_ENVIADOS:
@@ -421,14 +340,9 @@ def processar_partidas():
                 liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="gols"
             )
             
-            if nota_pressao >= 7 and prob_gols >= 0.45:
+            # FILTROS DE NOTA E PROBABILIDADE ZERADOS PARA TESTE
+            if nota_pressao >= 1 and prob_gols >= 0.0:
                 grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao)
-
-                bloco_avancado_str = ""
-                if estats_avancadas['xg_casa'] > 0.0 or estats_avancadas['xg_fora'] > 0.0:
-                    bloco_avancado_str += f"• xG (Expectativa de Gol): {estats_avancadas['xg_casa']} x {estats_avancadas['xg_fora']}\n"
-                if estats_avancadas['chutes_bloqueados_casa'] > 0 or estats_avancadas['chutes_bloqueados_fora'] > 0:
-                    bloco_avancado_str += f"• Chutes Bloqueados: {estats_avancadas['chutes_bloqueados_casa']} x {estats_avancadas['chutes_bloqueados_fora']}\n"
 
                 mensagem = (
                     f"🚨 **TENDÊNCIA PARA GOL ({periodo_etapa})** 🚨\n\n"
@@ -439,88 +353,25 @@ def processar_partidas():
                     f"• Posse: {estats['posse_casa']} x {estats['posse_fora']}\n"
                     f"• Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']}\n"
                     f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
-                    f"• Chutes para Fora: {estats['chutes_fora_casa']} x {estats['chutes_fora_fora']}\n"
-                    f"• Chutes Dentro da Área: {estats['chutes_dentro_area_casa']} x {estats['chutes_dentro_area_fora']}\n"
                     f"• Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}\n"
-                    f"{bloco_avancado_str}"
                     f"📈 **Gráfico de Momentum:**\n"
                     f"{grafico_visual}\n\n"
                     f"🎯 Mercado Sugerido: Mais de {total_gols_atual + 0.5} Gols ({periodo_etapa})\n"
                     f"💡 **Análise da Partida:**\n"
                     f"{analise_ia}\n\n"
-                    f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
+                    f"⚠️ Alerta de teste — gerencie sua banca."
                 )
                 
                 msg_id = enviar_alerta_telegram(mensagem)
                 if msg_id:
-                    print(f"   [ALERTA GOLS {periodo_etapa} ENVIADO] 🚨 {time_casa} x {time_fora} aos {minuto}' (Nota: {nota_pressao})")
+                    print(f"   [ALERTA GOLS ENVIADO] 🚨 {time_casa} x {time_fora} aos {minuto}'")
                     CACHE_ALERTAS_ENVIADOS[chave_gols] = tempo_atual
-                    MONITORAMENTO_FEEDBACK[chave_gols] = {
-                        'fixture_id': fixture_id,
-                        'tipo': 'gols',
-                        'gols_no_alerta': total_gols_atual,
-                        'time_casa': time_casa,
-                        'time_fora': time_fora,
-                        'minuto_alerta': minuto,
-                        'msg_id': msg_id
-                    }
-                    alertas_enviados_ciclo += 1
 
-        chave_cantos = f"{fixture_id}_cantos"
-        if (rolando_1t or rolando_2t) and chave_cantos not in CACHE_ALERTAS_ENVIADOS:
-            periodo_etapa = "1T" if status_short == '1H' else "2T"
-            estats = extrair_estatisticas(fixture_id)
-            estats_avancadas = extrair_estatisticas_avancadas(fixture_id)
-            total_cantos_atual = estats['cantos_casa'] + estats['cantos_fora']
-            
-            _, linha_mercado_sugerida, prob_cantos = projetar_escanteios_avancados(total_cantos_atual, minuto, status_short)
-
-            nota_pressao_cantos, analise_cantos_ia = gerar_analise_inteligente(
-                liga, time_casa, time_fora, gols_casa, gols_fora, minuto, periodo_etapa, estats, estats_avancadas, tipo="escanteios"
-            )
-            
-            if nota_pressao_cantos >= 7 and prob_cantos >= 0.40:
-                grafico_visual = gerar_grafico_momentum(fixture_id, nota_pressao_cantos)
-                meta_cantos_alvo = int(linha_mercado_sugerida + 0.5)
-
-                mensagem_cantos = (
-                    f"🚩 **TENDÊNCIA PARA ESCANTEIOS ({periodo_etapa})** 🚩\n\n"
-                    f"🏆 Liga: {liga}\n"
-                    f"⚽ Partida: {time_casa} {gols_casa} x {gols_fora} {time_fora}\n"
-                    f"⏱️ Alerta aos {minuto}' ({periodo_etapa}) • Total de Cantos: {total_cantos_atual}\n\n"
-                    f"📊 **Estatísticas de Pressão Lateral:**\n"
-                    f"• Escanteios: {estats['cantos_casa']} x {estats['cantos_fora']}\n"
-                    f"• Chutes Totais: {estats['chutes_totais_casa']} x {estats['chutes_totais_fora']}\n"
-                    f"• Chutes no Alvo: {estats['chutes_alvo_casa']} x {estats['chutes_alvo_fora']}\n"
-                    f"• Posse de Bola: {estats['posse_casa']} x {estats['posse_fora']}\n\n"
-                    f"📈 **Gráfico de Momentum:**\n"
-                    f"{grafico_visual}\n\n"
-                    f"🎯 Mercado Sugerido: Mais de {linha_mercado_sugerida} Escanteios (Live)\n"
-                    f"💡 **Análise da Partida:**\n"
-                    f"{analise_cantos_ia}\n\n"
-                    f"⚠️ Alerta estatístico baseado em dados reais — gerencie sua banca."
-                )
-                
-                msg_id = enviar_alerta_telegram(mensagem_cantos)
-                if msg_id:
-                    print(f"   [ALERTA ESCANTEIOS {periodo_etapa} ENVIADO] 🚩 {time_casa} x {time_fora} aos {minuto}' (Nota: {nota_pressao_cantos})")
-                    CACHE_ALERTAS_ENVIADOS[chave_cantos] = tempo_atual
-                    MONITORAMENTO_FEEDBACK[chave_cantos] = {
-                        'fixture_id': fixture_id,
-                        'tipo': 'escanteios',
-                        'meta_cantos': meta_cant_alvo,
-                        'time_casa': time_casa,
-                        'time_fora': time_fora,
-                        'minuto_alerta': minuto,
-                        'msg_id': msg_id
-                    }
-                    alertas_enviados_ciclo += 1
-
-    print(f"[{hora_atual}] Varredura finalizada. Alertas disparados neste ciclo: {alertas_enviados_ciclo}")
+    print(f"[{hora_atual}] Varredura finalizada.")
 
 if __name__ == "__main__":
-    print("🤖 Robô atualizado com modelo gemini-3.6-flash!")
-    enviar_alerta_telegram("🚀 *Robô atualizado: modelo Gemini corrigido para gemini-3.6-flash!*")
+    print("🤖 Robô em modo de teste flexibilizado!")
+    enviar_alerta_telegram("🚀 *Robô em modo de teste flexibilizado iniciado com sucesso!*")
     
     while True:
         try:
